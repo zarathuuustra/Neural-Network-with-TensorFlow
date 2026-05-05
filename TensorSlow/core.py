@@ -1,9 +1,9 @@
 import numpy as np
 
-# Capitalizing the first letter of class names is documented in Python's PEP8 coding style.
 class Variable:
     def __init__(self, data):
         self.data = data
+
 
 class Function:
     def __call__(self, input):
@@ -18,7 +18,6 @@ class Function:
         return output
 
     def forward(self, x):
-
         """
         forward propagation
         :param x:
@@ -26,10 +25,36 @@ class Function:
         """
         raise NotImplementedError()
 
+
 class Square(Function):
+    """
+    Inherits from the Function class AND squares the input of the values
+    """
+
     def forward(self, x):
         return x ** 2
 
+
 class Exp(Function):
+    """
+    Inherits from the Function class AND exponentiates the input of the values
+    """
+
     def forward(self, x):
         return np.exp(x)
+
+
+def numerical_diff(f, x, eps=1e-4):
+    """
+    Numerical Differentiation; derivative that represents the rate of change, which is defined as the amount of change
+    in a very short period of time.
+    :param f: Function
+    :param x: Variable
+    :param eps: Very small value to calculate the value without causing an error
+    :return:
+    """
+    x0 = Variable(x.data - eps)
+    x1 = Variable(x.data + eps)
+    y0 = f(x0)
+    y1 = f(x1)
+    return (y1.data - y0.data) / (2 * eps)
