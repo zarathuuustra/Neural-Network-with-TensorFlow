@@ -5,16 +5,31 @@ class Variable:
     def __init__(self, data):
         self.data = data
 
-# This example uses NumPy's multidimensional arrays to store data.
-# Machine learning systems use multidimensional arrays as the basic data structure.
-# x is an instance of Variable. The value is assigned to x.
-data = np.array(1.0)
-x = Variable(data)
-print(x.data)
-
 class Function:
     def __call__(self, input):
-        x = input.data  # read data
-        y = x ** 2  # calculation
-        output = Variable(y)  # return as a Variable
+        """
+        Retrieves data from the Variable and saving the calculation results to the Variable.
+        :param input:
+        :return:
+        """
+        x = input.data
+        y = self.forward(x)  # concrete calculation is implemented in forward method
+        output = Variable(y)
         return output
+
+    def forward(self, x):
+
+        """
+        forward propagation
+        :param x:
+        :return:
+        """
+        raise NotImplementedError()
+
+class Square(Function):
+    def forward(self, x):
+        return x ** 2
+
+class Exp(Function):
+    def forward(self, x):
+        return np.exp(x)
