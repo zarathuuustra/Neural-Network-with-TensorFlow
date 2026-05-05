@@ -3,6 +3,7 @@ import numpy as np
 class Variable:
     def __init__(self, data):
         self.data = data
+        self.grad = None # add the corresponding gradient value
 
 
 class Function:
@@ -14,6 +15,7 @@ class Function:
         """
         x = input.data
         y = self.forward(x)  # concrete calculation is implemented in forward method
+        self.input = input  # save input variables
         output = Variable(y)
         return output
 
@@ -25,6 +27,8 @@ class Function:
         """
         raise NotImplementedError()
 
+    def backward(self, gy):  # added
+        raise NotImplementedError()
 
 class Square(Function):
     """
