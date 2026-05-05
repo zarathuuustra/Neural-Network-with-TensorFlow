@@ -5,6 +5,9 @@ class Variable:
         self.data = data
         self.grad = None # add the corresponding gradient value
 
+    def set_creator(self, func):  # added the creator of the variable (function or non-function)
+        self.creator = func
+
 
 class Function:
     def __call__(self, input):
@@ -15,19 +18,26 @@ class Function:
         """
         x = input.data
         y = self.forward(x)  # concrete calculation is implemented in forward method
-        self.input = input  # save input variables
         output = Variable(y)
+        output.set_creator(self)  # Set parent(function); let the output variable save its creator
+        self.input = input  # save input variables
+        self.output = output  # Set output
         return output
 
     def forward(self, x):
         """
-        forward propagation
+        forward propagation of the base class
         :param x:
         :return:
         """
         raise NotImplementedError()
 
     def backward(self, gy):  # added
+        """
+        backward propagation of the base class
+        :param gy:
+        :return:
+        """
         raise NotImplementedError()
 
 class Square(Function):
@@ -36,7 +46,8 @@ class Square(Function):
     """
 
     def forward(self, x):
-        return x ** 2
+        y = x ** 2
+        return y
 
     def backward(self, gy):
         x = self.input.data
@@ -49,7 +60,8 @@ class Exp(Function):
     """
 
     def forward(self, x):
-        return np.exp(x)
+        y = np.exp(x)
+        return y
 
     def backward(self, gy):
         x = self.input.data
@@ -70,3 +82,20 @@ def numerical_diff(f, x, eps=1e-4):
     y0 = f(x0)
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
+
+A = Square()
+B = Exp()
+C = Square()
+
+x = Variable(np.array(0.5))
+a = A(x)
+b = B(a)
+y = C(b)
+print(y.data) # Square -> Exp -> Square -> Result
+
+
+y.grad = np.array(1.0)
+b.grad = C.backward(y.grad)
+a.grad = B.backward(b.grad)
+x.grad = A.backward(a.grad)
+print(x.grad)
