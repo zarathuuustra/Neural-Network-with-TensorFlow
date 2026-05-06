@@ -6,15 +6,41 @@ class Variable:
     """
     Variable class that only supports data from `ndarray` instances
     """
-    def __init__(self, data):
+    def __init__(self, data, name=None):
         if data is not None:   # added
             if not isinstance(data, np.ndarray):
                 raise TypeError('{} is not supported'.format(type(data)))
 
         self.data = data
+        self.name = name
         self.grad = None # add the corresponding gradient value
         self.creator = None
         self.generation = 0 # to get the correct order/priority
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def size(self):
+        return self.data.size
+
+    @property
+    def ndim(self):
+        return self.data.ndim
+
+    @property
+    def dtype(self):
+        return self.data.dtype
+
+    def __len__(self):
+        return len(self.data)
+
+    def __repr__(self): # print
+        if self.data is None:
+            return 'variable(None)'
+        p = str(self.data).replace('\n', '\n' + ' ' * 9)
+        return 'variable(' + p + ')'
 
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
@@ -222,7 +248,10 @@ def using_config(name, value):
 def no_grad():
     return using_config('enable_backprop', False)
 
-with no_grad():
-    x = Variable(np.array(2.0))
-    y = square(x)
-    print(y.data)
+# with no_grad():
+#     x = Variable(np.array(2.0))
+#     y = square(x)
+#     print(y.data)
+
+x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
+print(x.shape)  # use x.shape to replace x.shape()
