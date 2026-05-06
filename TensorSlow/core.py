@@ -10,11 +10,14 @@ class Variable:
         self.creator = func
 
     def backward(self):
-        f = self.creator  # 1. get the function
-        if f is not None:
-            x = f.input  # 2. get the function's input
-            x.grad = f.backward(self.grad)  # 3. call the function's backward method
-            x.backward()  # call the previous Variable's backward method (recursively)
+        funcs = [self.creator]  # use list to record functions
+        while funcs:
+            f = funcs.pop()  # 1. Get a function
+            x, y = f.input, f.output  # 2. Get the function's input/output
+            x.grad = f.backward(y.grad)  # 3. Call the function's backward
+
+            if x.creator is not None:
+                funcs.append(x.creator) # 4. add previous functions to the list
 
 
 class Function:
@@ -91,16 +94,16 @@ def numerical_diff(f, x, eps=1e-4):
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
 
-A = Square()
-B = Exp()
-C = Square()
+def square(x):
+    return Square()(x)
 
+def exp(x):
+    return Exp()(x)
+
+# To test out if everything works as intended
 x = Variable(np.array(0.5))
-a = A(x)
-b = B(a)
-y = C(b)
+y = square(exp(square(x)))  # sequential calling
 
-# backpropagation
 y.grad = np.array(1.0)
 y.backward()
-print(x.grad)  # 3.297442541400256; same with previous code
+print(x.grad)
