@@ -1,5 +1,5 @@
 import numpy as np
-
+import unittest
 
 class Variable:
     """
@@ -123,11 +123,19 @@ def as_array(x):
         return np.array(x)
     return x
 
-# To test out if everything works as intended
-x = Variable(np.array(1.0))  # OK
-x = Variable(None)  # OK
+class SquareTest(unittest.TestCase):
+    """
+    Convenient way to test in Python with unittest.
+    """
+    def test_forward(self):
+        x = Variable(np.array(2.0))
+        y = square(x)
+        expected = np.array(4.0)
+        self.assertEqual(y.data, expected) # assert to verify the output
 
-print(np.isscalar(np.float64(1.0)))  # True
-print(np.isscalar(2.0))  # True
-print(np.isscalar(np.array(1.0)))  # False
-print(np.isscalar(np.array([1, 2, 3])))  # False
+    def test_backward(self):  # added
+        x = Variable(np.array(3.0))
+        y = square(x)
+        y.backward()
+        expected = np.array(6.0)
+        self.assertEqual(x.grad, expected)
