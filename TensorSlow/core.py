@@ -8,6 +8,13 @@ class Variable:
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
 
+    def backward(self):
+        f = self.creator  # 1. get the function
+        if f is not None:
+            x = f.input  # 2. get the function's input
+            x.grad = f.backward(self.grad)  # 3. call the function's backward method
+            x.backward()  # call the previous Variable's backward method (recursively)
+
 
 class Function:
     def __call__(self, input):
@@ -91,11 +98,18 @@ x = Variable(np.array(0.5))
 a = A(x)
 b = B(a)
 y = C(b)
-print(y.data) # Square -> Exp -> Square -> Result
-
 
 y.grad = np.array(1.0)
-b.grad = C.backward(y.grad)
+
+C = y.creator  # 1. get the function
+b = C.input  # 2. get input from the function
+b.grad = C.backward(y.grad)  # 3. call the backward method from the function
+
+B = b.creator
+a = B.input
 a.grad = B.backward(b.grad)
+
+A = a.creator
+x = A.input
 x.grad = A.backward(a.grad)
-print(x.grad)
+print(x.grad) # 3.297442541400256
