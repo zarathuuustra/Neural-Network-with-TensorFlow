@@ -4,6 +4,7 @@ class Variable:
     def __init__(self, data):
         self.data = data
         self.grad = None # add the corresponding gradient value
+        self.creator = None  # added
 
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
@@ -99,17 +100,7 @@ a = A(x)
 b = B(a)
 y = C(b)
 
+# backpropagation
 y.grad = np.array(1.0)
-
-C = y.creator  # 1. get the function
-b = C.input  # 2. get input from the function
-b.grad = C.backward(y.grad)  # 3. call the backward method from the function
-
-B = b.creator
-a = B.input
-a.grad = B.backward(b.grad)
-
-A = a.creator
-x = A.input
-x.grad = A.backward(a.grad)
-print(x.grad) # 3.297442541400256
+y.backward()
+print(x.grad)  # 3.297442541400256; same with previous code
