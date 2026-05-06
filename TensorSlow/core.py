@@ -33,21 +33,23 @@ class Variable:
 
 
 class Function:
-    def __call__(self, inputs):
+    def __call__(self, *inputs): # Asterisk for any number of arguments
         """
         Retrieves data from the Variable and saving the calculation results to the Variable.
         :param inputs:
         :return:
         """
         xs = [x.data for x in inputs] # to support multiple inputs and outputs
-        ys = self.forward(xs)  # concrete calculation is implemented in forward method
+        ys = self.forward(*xs)  # concrete calculation is implemented in forward method
+        if not isinstance(ys, tuple):  # added
+            ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]   # wrap data
 
         for output in outputs: # loops for creator records
             output.set_creator(self)  # Set parent(function); let the output variable save its creator
         self.input = inputs  # save input variables
         self.outputs = outputs  # Set output
-        return outputs
+        return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, x):
         """
@@ -109,10 +111,29 @@ def numerical_diff(f, x, eps=1e-4):
     return (y1.data - y0.data) / (2 * eps)
 
 def square(x):
+    """
+    To make square to a python function
+    :param x:
+    :return:
+    """
     return Square()(x)
 
 def exp(x):
+    """
+    to make exponential to a python function
+    :param x:
+    :return:
+    """
     return Exp()(x)
+
+def add(x0, x1):
+    """
+    to make addition to a python function
+    :param x0:
+    :param x1:
+    :return:
+    """
+    return Add()(x0, x1)
 
 def as_array(x):
     """
@@ -125,17 +146,16 @@ def as_array(x):
         return np.array(x)
     return x
 
+
 class Add(Function):
     """
     Performs the addition of two variables
     """
-    def forward(self, xs):
-        x0, x1 = xs # sequence unpacking of [x0 gets the first item, x1 the second one, etc.]
+    def forward(self, x0, x1):
         y = x0 + x1
         return (y,)   # tuple
 
-xs = [Variable(np.array(2)), Variable(np.array(3))]  # intialize as list
-f = Add()
-ys = f(xs)  # ys - tuple
-y = ys[0]
+x0 = Variable(np.array(2))
+x1 = Variable(np.array(3))
+y = add(x0, x1)
 print(y.data)
