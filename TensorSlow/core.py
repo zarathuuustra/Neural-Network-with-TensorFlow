@@ -25,11 +25,16 @@ class Variable:
         funcs = [self.creator]  # use list to record functions
         while funcs:
             f = funcs.pop()  # 1. Get a function
-            x, y = f.input, f.output  # 2. Get the function's input/output
-            x.grad = f.backward(y.grad)  # 3. Call the function's backward
+            gys = [output.grad for output in f.outputs] # Summarise the derivatives of the output variables in the list
+            gxs = f.backward(*gys)    # call backpropagation and unwrap the list
+            if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
+                gxs = (gxs,)
 
-            if x.creator is not None:
-                funcs.append(x.creator) # 4. add previous functions to the list
+            for x, gx in zip(f.inputs, gxs): # set the derivate in the backpropagation to the grad variable
+                x.grad = gx
+
+                if x.creator is not None:
+                    funcs.append(x.creator) # 4. add previous functions to the list
 
 
 class Function:
@@ -47,7 +52,7 @@ class Function:
 
         for output in outputs: # loops for creator records
             output.set_creator(self)  # Set parent(function); let the output variable save its creator
-        self.input = inputs  # save input variables
+        self.inputs = inputs  # save input variables
         self.outputs = outputs  # Set output
         return outputs if len(outputs) > 1 else outputs[0]
 
@@ -77,7 +82,7 @@ class Square(Function):
         return y
 
     def backward(self, gy):
-        x = self.input.data
+        x = self.inputs[0].data
         gx = 2 * x * gy
         return gx
 
@@ -116,7 +121,8 @@ def square(x):
     :param x:
     :return:
     """
-    return Square()(x)
+    f = Square()
+    return f(x)
 
 def exp(x):
     """
@@ -153,9 +159,17 @@ class Add(Function):
     """
     def forward(self, x0, x1):
         y = x0 + x1
-        return (y,)   # tuple
+        return y
 
-x0 = Variable(np.array(2))
-x1 = Variable(np.array(3))
-y = add(x0, x1)
-print(y.data)
+    def backward(self, gy):
+        return gy, gy
+
+
+x = Variable(np.array(2.0))
+y = Variable(np.array(3.0))
+
+z = add(square(x), square(y))
+z.backward()
+print(z.data)
+print(x.grad)
+print(y.grad)
