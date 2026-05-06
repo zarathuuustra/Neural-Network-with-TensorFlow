@@ -1,7 +1,15 @@
 import numpy as np
 
+
 class Variable:
+    """
+    Variable class that only supports data from `ndarray` instances
+    """
     def __init__(self, data):
+        if data is not None:   # added
+            if not isinstance(data, np.ndarray):
+                raise TypeError('{} is not supported'.format(type(data)))
+
         self.data = data
         self.grad = None # add the corresponding gradient value
         self.creator = None  # added
@@ -33,7 +41,7 @@ class Function:
         """
         x = input.data
         y = self.forward(x)  # concrete calculation is implemented in forward method
-        output = Variable(y)
+        output = Variable(as_array(y))
         output.set_creator(self)  # Set parent(function); let the output variable save its creator
         self.input = input  # save input variables
         self.output = output  # Set output
@@ -104,9 +112,22 @@ def square(x):
 def exp(x):
     return Exp()(x)
 
-# To test out if everything works as intended
-x = Variable(np.array(0.5))
-y = square(exp(square(x)))
+def as_array(x):
+    """
+    If the value of the input is a scalar, convert it to an array.
+    Otherwise do nothing.
+    :param x: the converted value of the input
+    :return:
+    """
+    if np.isscalar(x):
+        return np.array(x)
+    return x
 
-y.backward()
-print(x.grad)
+# To test out if everything works as intended
+x = Variable(np.array(1.0))  # OK
+x = Variable(None)  # OK
+
+print(np.isscalar(np.float64(1.0)))  # True
+print(np.isscalar(2.0))  # True
+print(np.isscalar(np.array(1.0)))  # False
+print(np.isscalar(np.array([1, 2, 3])))  # False
