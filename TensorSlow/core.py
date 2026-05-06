@@ -12,7 +12,7 @@ class Variable:
 
         self.data = data
         self.grad = None # add the corresponding gradient value
-        self.creator = None  # added
+        self.creator = None
 
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
@@ -33,19 +33,21 @@ class Variable:
 
 
 class Function:
-    def __call__(self, input):
+    def __call__(self, inputs):
         """
         Retrieves data from the Variable and saving the calculation results to the Variable.
-        :param input:
+        :param inputs:
         :return:
         """
-        x = input.data
-        y = self.forward(x)  # concrete calculation is implemented in forward method
-        output = Variable(as_array(y))
-        output.set_creator(self)  # Set parent(function); let the output variable save its creator
-        self.input = input  # save input variables
-        self.output = output  # Set output
-        return output
+        xs = [x.data for x in inputs] # to support multiple inputs and outputs
+        ys = self.forward(xs)  # concrete calculation is implemented in forward method
+        outputs = [Variable(as_array(y)) for y in ys]   # wrap data
+
+        for output in outputs: # loops for creator records
+            output.set_creator(self)  # Set parent(function); let the output variable save its creator
+        self.input = inputs  # save input variables
+        self.outputs = outputs  # Set output
+        return outputs
 
     def forward(self, x):
         """
