@@ -17,6 +17,9 @@ class Variable:
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
 
+    def cleargrad(self): # resets the derivatives stored in the variable.
+        self.grad = None
+
     def backward(self):
         # for the user to omit y.grad = np.array(1.0)
         if self.grad is None:  # added
@@ -31,7 +34,10 @@ class Variable:
                 gxs = (gxs,)
 
             for x, gx in zip(f.inputs, gxs): # set the derivate in the backpropagation to the grad variable
-                x.grad = gx
+                if x.grad is None:
+                    x.grad = gx
+                else:
+                    x.grad = x.grad + gx
 
                 if x.creator is not None:
                     funcs.append(x.creator) # 4. add previous functions to the list
@@ -164,12 +170,15 @@ class Add(Function):
     def backward(self, gy):
         return gy, gy
 
+# Testing stage
+# The first calculation
+x = Variable(np.array(3.0))
+y = add(x, x)
+y.backward()
+print(x.grad)  # 2.0
 
-x = Variable(np.array(2.0))
-y = Variable(np.array(3.0))
-
-z = add(square(x), square(y))
-z.backward()
-print(z.data)
-print(x.grad)
-print(y.grad)
+# The second（use the same x）
+x.cleargrad()  #
+y = add(add(x, x), x)
+y.backward()
+print(x.grad)  # 3.0
