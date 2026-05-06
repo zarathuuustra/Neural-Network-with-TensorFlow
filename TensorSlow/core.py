@@ -2,6 +2,28 @@ import numpy as np
 import weakref
 import contextlib
 
+
+class Config:  # a way to enable/disable backpropagation mode
+    enable_backprop = True
+
+
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+def no_grad():
+    """
+    A way to use the context manager with the enable backpropagation mode
+    :return:
+    """
+    return using_config('enable_backprop', False)
+
+
 class Variable:
     """
     Variable class that only supports data from `ndarray` instances
@@ -118,9 +140,10 @@ class Function:
                 output.set_creator(self)  # Set parent(function); let the output variable save its creator; reference
             self.inputs = inputs  # save input variables
             self.outputs = [weakref.ref(output) for output in outputs]  # weak reference to exclude a circular reference
+
         return outputs if len(outputs) > 1 else outputs[0]
 
-    def forward(self, x):
+    def forward(self, xs):
         """
         forward propagation of the base class
         :param x:
@@ -128,7 +151,7 @@ class Function:
         """
         raise NotImplementedError()
 
-    def backward(self, gy):  # added
+    def backward(self, gys):  # added
         """
         backward propagation of the base class
         :param gy:
@@ -137,8 +160,23 @@ class Function:
         raise NotImplementedError()
 
 
-class Config:  # a way to enable/disable backpropagation mode
-    enable_backprop = True
+class Mul(Function):
+    def forward(self, x0, x1):
+        y = x0 * x1
+        return y
+
+    def backward(self, gy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        return gy * x1, gy * x0
+
+def mul(x0, x1):
+    """
+    Multiplication in TensorSlow
+    :param x0:
+    :param x1:
+    :return:
+    """
+    return Mul()(x0, x1)
 
 
 class Square(Function):
@@ -235,23 +273,25 @@ def add(x0, x1):
 
 # Testing stage
 
-
-@contextlib.contextmanager
-def using_config(name, value):
-    old_value = getattr(Config, name)
-    setattr(Config, name, value)
-    try:
-        yield
-    finally:
-        setattr(Config, name, old_value)
-
-def no_grad():
-    return using_config('enable_backprop', False)
-
+# to test with no backpropogation
 # with no_grad():
 #     x = Variable(np.array(2.0))
 #     y = square(x)
 #     print(y.data)
 
-x = Variable(np.array([[1, 2, 3], [4, 5, 6]]))
-print(x.shape)  # use x.shape to replace x.shape()
+Variable.__mul__ = mul
+Variable.__add__ = add
+
+a = Variable(np.array(3.0))
+b = Variable(np.array(2.0))
+c = Variable(np.array(1.0))
+
+Variable.__mul__ = mul
+Variable.__add__ = add
+
+y = a * b + c
+y.backward()
+
+print(y)
+print(a.grad)
+print(b.grad)
