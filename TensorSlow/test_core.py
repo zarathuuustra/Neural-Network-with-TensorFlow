@@ -18,5 +18,12 @@ class SquareTest(unittest.TestCase):
         expected = np.array(6.0)
         self.assertEqual(x.grad, expected)
 
+    def test_variable(self):
+        """
+        To see if the variable class functions properly
+        :return:
+        """
+        self.assertRaises(TypeError, Variable, 2)
+
 if __name__ == '__main__':
     unittest.main()
