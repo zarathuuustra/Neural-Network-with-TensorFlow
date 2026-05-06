@@ -1,5 +1,5 @@
 import numpy as np
-import unittest
+import weakref
 
 class Variable:
     """
@@ -45,7 +45,9 @@ class Variable:
 
         while funcs:
             f = funcs.pop()  # 1. Get a function
-            gys = [output.grad for output in f.outputs] # Summarise the derivatives of the output variables in the list
+            gys = [output().grad for output in f.outputs] # Summarise the derivatives of the output variables in the list
+            # the output is weakref
+
             gxs = f.backward(*gys)    # call backpropagation and unwrap the list
             if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
                 gxs = (gxs,)
@@ -77,7 +79,7 @@ class Function:
         for output in outputs: # loops for creator records
             output.set_creator(self)  # Set parent(function); let the output variable save its creator
         self.inputs = inputs  # save input variables
-        self.outputs = outputs  # Set output
+        self.outputs = [weakref.ref(output) for output in outputs]  # weak reference to exclude a circular reference
         return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, x):
@@ -109,6 +111,14 @@ class Square(Function):
         x = self.inputs[0].data
         gx = 2 * x * gy
         return gx
+
+def square(x):
+    """
+    To make square to a python function
+    :param x:
+    :return:
+    """
+    return Square()(x)
 
 class Exp(Function):
     """
@@ -147,14 +157,6 @@ def numerical_diff(f, x, eps=1e-4):
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
 
-def square(x):
-    """
-    To make square to a python function
-    :param x:
-    :return:
-    """
-    return Square()(x)
-
 def as_array(x):
     """
     If the value of the input is a scalar, convert it to an array.
@@ -188,11 +190,7 @@ def add(x0, x1):
     return Add()(x0, x1)
 
 # Testing stage
-
-x = Variable(np.array(2.0))
-a = square(x)
-y = add(square(a), square(a))
-y.backward()
-
-print(y.data)  # 32
-print(x.grad)  # 64
+for i in range(10):
+    x = Variable(np.random.randn(10000))  # 大量数据
+    y = square(square(square(x)))  # 进行复杂的计算
+    print(y.data)
