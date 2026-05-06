@@ -2,10 +2,32 @@ import unittest
 from core import *
 
 
+#Best Practices:
+# 1) Test should be isolated; they shouldn't depend on each other
+# 2) Test-driven development: Write the test before you write the code
+
+
+
 class SquareTest(unittest.TestCase):
     """
     Convenient way to test in Python with unittest.
     """
+    @classmethod
+    def setUpClass(cls):
+        """
+        Wird einmal vor allem anderen aufgerufen
+        :return:
+        """
+        print("Setting up...")
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Wird einmal nach allem anderen aufgerufen
+        :return:
+        """
+        print("Finished...")
+
     def setUp(self):
         """
         This method is called before every test.
