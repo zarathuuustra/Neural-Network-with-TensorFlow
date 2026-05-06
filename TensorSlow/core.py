@@ -22,7 +22,13 @@ class Variable:
     def cleargrad(self): # resets the derivatives stored in the variable.
         self.grad = None
 
-    def backward(self):
+    def backward(self, retain_grad=False):
+        """
+
+        :param retain_grad: if true = gradients retain derivates;
+        if false = derivates of intermediate variables is reset
+        :return:
+        """
         # for the user to omit y.grad = np.array(1.0)
         if self.grad is None:  # added
             self.grad = np.ones_like(self.data) # creates a derivative-> =1
@@ -60,6 +66,10 @@ class Variable:
 
                 if x.creator is not None:
                     add_func(x.creator) # 4. add previous functions to the list
+
+                if not retain_grad:  # added!
+                    for y in f.outputs:
+                        y().grad = None  # y is weakref
 
 
 class Function:
@@ -190,7 +200,11 @@ def add(x0, x1):
     return Add()(x0, x1)
 
 # Testing stage
-for i in range(10):
-    x = Variable(np.random.randn(10000))  # 大量数据
-    y = square(square(square(x)))  # 进行复杂的计算
-    print(y.data)
+x0 = Variable(np.array(1.0))
+x1 = Variable(np.array(1.0))
+t = add(x0, x1)
+y = add(x0, t)
+y.backward()
+
+print(y.grad, t.grad)
+print(x0.grad, x1.grad)
