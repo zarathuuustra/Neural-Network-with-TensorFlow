@@ -1,5 +1,6 @@
 import numpy as np
 import weakref
+import contextlib
 
 class Variable:
     """
@@ -85,11 +86,12 @@ class Function:
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]   # wrap data
 
-        self.generation = max([x.generation for x in inputs])
-        for output in outputs: # loops for creator records
-            output.set_creator(self)  # Set parent(function); let the output variable save its creator
-        self.inputs = inputs  # save input variables
-        self.outputs = [weakref.ref(output) for output in outputs]  # weak reference to exclude a circular reference
+        if Config.enable_backprop:
+            self.generation = max([x.generation for x in inputs]) # set generations
+            for output in outputs: # loops for creator records
+                output.set_creator(self)  # Set parent(function); let the output variable save its creator; reference
+            self.inputs = inputs  # save input variables
+            self.outputs = [weakref.ref(output) for output in outputs]  # weak reference to exclude a circular reference
         return outputs if len(outputs) > 1 else outputs[0]
 
     def forward(self, x):
@@ -107,6 +109,11 @@ class Function:
         :return:
         """
         raise NotImplementedError()
+
+
+class Config:  # a way to enable/disable backpropagation mode
+    enable_backprop = True
+
 
 class Square(Function):
     """
@@ -199,12 +206,23 @@ def add(x0, x1):
     """
     return Add()(x0, x1)
 
-# Testing stage
-x0 = Variable(np.array(1.0))
-x1 = Variable(np.array(1.0))
-t = add(x0, x1)
-y = add(x0, t)
-y.backward()
 
-print(y.grad, t.grad)
-print(x0.grad, x1.grad)
+# Testing stage
+
+
+@contextlib.contextmanager
+def using_config(name, value):
+    old_value = getattr(Config, name)
+    setattr(Config, name, value)
+    try:
+        yield
+    finally:
+        setattr(Config, name, old_value)
+
+def no_grad():
+    return using_config('enable_backprop', False)
+
+with no_grad():
+    x = Variable(np.array(2.0))
+    y = square(x)
+    print(y.data)
