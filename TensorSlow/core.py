@@ -13,9 +13,11 @@ class Variable:
         self.data = data
         self.grad = None # add the corresponding gradient value
         self.creator = None
+        self.generation = 0 # to get the correct order/priority
 
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
+        self.generation = func.generation + 1 # the generaion advances if there is a creator
 
     def cleargrad(self): # resets the derivatives stored in the variable.
         self.grad = None
@@ -25,7 +27,22 @@ class Variable:
         if self.grad is None:  # added
             self.grad = np.ones_like(self.data) # creates a derivative-> =1
 
-        funcs = [self.creator]  # use list to record functions
+        funcs = []
+        seen_set = set() # purpose = to prevent the same function from being added to the list more than once
+
+        def add_func(f):
+            """
+            list of functions will be sorted by generation
+            :param f:
+            :return:
+            """
+            if f not in seen_set:
+                funcs.append(f)
+                seen_set.add(f)
+                funcs.sort(key=lambda x: x.generation)
+
+        add_func(self.creator)
+
         while funcs:
             f = funcs.pop()  # 1. Get a function
             gys = [output.grad for output in f.outputs] # Summarise the derivatives of the output variables in the list
@@ -40,7 +57,7 @@ class Variable:
                     x.grad = x.grad + gx
 
                 if x.creator is not None:
-                    funcs.append(x.creator) # 4. add previous functions to the list
+                    add_func(x.creator) # 4. add previous functions to the list
 
 
 class Function:
@@ -56,6 +73,7 @@ class Function:
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]   # wrap data
 
+        self.generation = max([x.generation for x in inputs])
         for output in outputs: # loops for creator records
             output.set_creator(self)  # Set parent(function); let the output variable save its creator
         self.inputs = inputs  # save input variables
@@ -106,6 +124,14 @@ class Exp(Function):
         gx = np.exp(x) * gy
         return gx
 
+def exp(x):
+    """
+    to make exponential to a python function
+    :param x:
+    :return:
+    """
+    return Exp()(x)
+
 def numerical_diff(f, x, eps=1e-4):
     """
     Numerical Differentiation; derivative that represents the rate of change, which is defined as the amount of change
@@ -127,25 +153,7 @@ def square(x):
     :param x:
     :return:
     """
-    f = Square()
-    return f(x)
-
-def exp(x):
-    """
-    to make exponential to a python function
-    :param x:
-    :return:
-    """
-    return Exp()(x)
-
-def add(x0, x1):
-    """
-    to make addition to a python function
-    :param x0:
-    :param x1:
-    :return:
-    """
-    return Add()(x0, x1)
+    return Square()(x)
 
 def as_array(x):
     """
@@ -170,15 +178,21 @@ class Add(Function):
     def backward(self, gy):
         return gy, gy
 
-# Testing stage
-# The first calculation
-x = Variable(np.array(3.0))
-y = add(x, x)
-y.backward()
-print(x.grad)  # 2.0
+def add(x0, x1):
+    """
+    to make addition to a python function
+    :param x0:
+    :param x1:
+    :return:
+    """
+    return Add()(x0, x1)
 
-# The second（use the same x）
-x.cleargrad()  #
-y = add(add(x, x), x)
+# Testing stage
+
+x = Variable(np.array(2.0))
+a = square(x)
+y = add(square(a), square(a))
 y.backward()
-print(x.grad)  # 3.0
+
+print(y.data)  # 32
+print(x.grad)  # 64
