@@ -124,3 +124,18 @@ def as_array(x):
     if np.isscalar(x):
         return np.array(x)
     return x
+
+class Add(Function):
+    """
+    Performs the addition of two variables
+    """
+    def forward(self, xs):
+        x0, x1 = xs # sequence unpacking of [x0 gets the first item, x1 the second one, etc.]
+        y = x0 + x1
+        return (y,)   # tuple
+
+xs = [Variable(np.array(2)), Variable(np.array(3))]  # intialize as list
+f = Add()
+ys = f(xs)  # ys - tuple
+y = ys[0]
+print(y.data)
