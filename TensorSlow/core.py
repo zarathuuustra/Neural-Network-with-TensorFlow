@@ -10,6 +10,10 @@ class Variable:
         self.creator = func
 
     def backward(self):
+        # for the user to omit y.grad = np.array(1.0)
+        if self.grad is None:  # added
+            self.grad = np.ones_like(self.data) # creates a derivative-> =1
+
         funcs = [self.creator]  # use list to record functions
         while funcs:
             f = funcs.pop()  # 1. Get a function
@@ -102,8 +106,7 @@ def exp(x):
 
 # To test out if everything works as intended
 x = Variable(np.array(0.5))
-y = square(exp(square(x)))  # sequential calling
+y = square(exp(square(x)))
 
-y.grad = np.array(1.0)
 y.backward()
 print(x.grad)
