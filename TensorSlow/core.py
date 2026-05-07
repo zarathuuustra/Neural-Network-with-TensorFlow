@@ -120,6 +120,28 @@ class Variable:
                     for y in f.outputs:
                         y().grad = None  # y is weakref
 
+def as_array(x):
+    """
+    If the value of the input is a scalar, convert it to an array.
+    Otherwise do nothing.
+    :param x: the converted value of the input
+    :return:
+    """
+    if np.isscalar(x):
+        return np.array(x)
+    return x
+
+
+def as_variable(obj):
+    """
+    So that variable instances can be used with ndarrays
+    :param obj:
+    :return:
+    """
+    if isinstance(obj, Variable):
+        return obj
+    return Variable(obj)
+
 
 class Function:
     def __call__(self, *inputs): # Asterisk for any number of arguments
@@ -128,13 +150,15 @@ class Function:
         :param inputs:
         :return:
         """
+        inputs = [as_variable(input) for input in inputs]
+
         xs = [x.data for x in inputs] # to support multiple inputs and outputs
         ys = self.forward(*xs)  # concrete calculation is implemented in forward method
         if not isinstance(ys, tuple):  # added
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]   # wrap data
 
-        if Config.enable_backprop:
+        if Config.enable_backprop: # if backpropagation is active
             self.generation = max([x.generation for x in inputs]) # set generations
             for output in outputs: # loops for creator records
                 output.set_creator(self)  # Set parent(function); let the output variable save its creator; reference
@@ -143,23 +167,13 @@ class Function:
 
         return outputs if len(outputs) > 1 else outputs[0]
 
-    def forward(self, xs):
-        """
-        forward propagation of the base class
-        :param x:
-        :return:
-        """
+    def forward(self, xs): # forward function of the base class
         raise NotImplementedError()
 
-    def backward(self, gys):  # added
-        """
-        backward propagation of the base class
-        :param gy:
-        :return:
-        """
+    def backward(self, gys):  # backward function of the base class
         raise NotImplementedError()
 
-
+########## Multiplication ###########
 class Mul(Function):
     def forward(self, x0, x1):
         y = x0 * x1
@@ -176,9 +190,10 @@ def mul(x0, x1):
     :param x1:
     :return:
     """
+    x1 = as_array(x1)
     return Mul()(x0, x1)
 
-
+########## Square ###############
 class Square(Function):
     """
     Inherits from the Function class AND squares the input of the values
@@ -201,6 +216,7 @@ def square(x):
     """
     return Square()(x)
 
+########### Exp ######################
 class Exp(Function):
     """
     Inherits from the Function class AND exponentiates the input of the values
@@ -223,6 +239,7 @@ def exp(x):
     """
     return Exp()(x)
 
+######### Numerical differentiation - in contrast to automatic backpropagation #####
 def numerical_diff(f, x, eps=1e-4):
     """
     Numerical Differentiation; derivative that represents the rate of change, which is defined as the amount of change
@@ -238,18 +255,7 @@ def numerical_diff(f, x, eps=1e-4):
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
 
-def as_array(x):
-    """
-    If the value of the input is a scalar, convert it to an array.
-    Otherwise do nothing.
-    :param x: the converted value of the input
-    :return:
-    """
-    if np.isscalar(x):
-        return np.array(x)
-    return x
-
-
+############ Addition ######################
 class Add(Function):
     """
     Performs the addition of two variables
@@ -268,10 +274,11 @@ def add(x0, x1):
     :param x1:
     :return:
     """
+    x1 = as_array(x1) # -> ndarray
     return Add()(x0, x1)
 
 
-# Testing stage
+############### Testing stage #####################
 
 # to test with no backpropogation
 # with no_grad():
@@ -282,16 +289,6 @@ def add(x0, x1):
 Variable.__mul__ = mul
 Variable.__add__ = add
 
-a = Variable(np.array(3.0))
-b = Variable(np.array(2.0))
-c = Variable(np.array(1.0))
-
-Variable.__mul__ = mul
-Variable.__add__ = add
-
-y = a * b + c
-y.backward()
-
+x = Variable(np.array(2.0))
+y = 2.0 * x
 print(y)
-print(a.grad)
-print(b.grad)
