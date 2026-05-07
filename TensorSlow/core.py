@@ -28,6 +28,7 @@ class Variable:
     """
     Variable class that only supports data from `ndarray` instances
     """
+    __array_priority__ = 200 # added priority (larger than 0 and 10)
     def __init__(self, data, name=None):
         if data is not None:   # added
             if not isinstance(data, np.ndarray):
@@ -286,9 +287,11 @@ def add(x0, x1):
 #     y = square(x)
 #     print(y.data)
 
-Variable.__mul__ = mul
 Variable.__add__ = add
+Variable.__radd__ = add
+Variable.__mul__ = mul
+Variable.__rmul__ = mul
 
 x = Variable(np.array(2.0))
-y = 2.0 * x
+y = 3.0 * x + 1.0
 print(y)
