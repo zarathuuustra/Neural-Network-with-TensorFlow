@@ -387,10 +387,3 @@ Variable.__pow__ = pow
 #     x = Variable(np.array(2.0))
 #     y = square(x)
 #     print(y.data)
-
-
-x = Variable(np.array(2.0))
-y1 = 2.0 - x
-y2 = x - 1.0
-print(y1)
-print(y2)

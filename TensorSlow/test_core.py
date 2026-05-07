@@ -1,5 +1,5 @@
 import unittest
-from core import *
+from core_simple import *
 
 
 #Best Practices:
