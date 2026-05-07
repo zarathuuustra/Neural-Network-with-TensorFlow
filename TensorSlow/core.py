@@ -201,6 +201,27 @@ def mul(x0, x1):
     return Mul()(x0, x1)
 
 
+############# Division ###################
+class Div(Function):
+    def forward(self, x0, x1):
+        y = x0 / x1
+        return y
+
+    def backward(self, gy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        gx0 = gy / x1
+        gx1 = gy * (-x0 / x1 ** 2)
+        return gx0, gx1
+
+def div(x0, x1):
+    x1 = as_array(x1)
+    return Div()(x0, x1)
+
+def rdiv(x0, x1):
+    x1 = as_array(x1)
+    return Div()(x1, x0)  # swap x1 and  x0
+
+
 ########## Square ###############
 class Square(Function):
     """
@@ -229,7 +250,7 @@ def square(x):
 ########### Exp ######################
 class Exp(Function):
     """
-    Inherits from the Function class AND exponentiates the input of the values
+    Applies the natural exponential function to the input.
     """
 
     def forward(self, x):
@@ -249,6 +270,24 @@ def exp(x):
     :return:
     """
     return Exp()(x)
+
+########### Power operator ###############
+class Pow(Function):
+    def __init__(self, c):
+        self.c = c
+
+    def forward(self, x):
+        y = x ** self.c
+        return y
+
+    def backward(self, gy):
+        x = self.inputs[0].data
+        c = self.c
+        gx = c * x ** (c - 1) * gy
+        return gx
+
+def pow(x, c):
+    return Pow(c)(x)
 
 
 ######### Numerical differentiation - in contrast to automatic backpropagation #####
@@ -338,6 +377,9 @@ Variable.__rmul__ = mul
 Variable.__neg__ = neg
 Variable.__sub__ = sub
 Variable.__rsub__ = rsub
+Variable.__truediv__ = div
+Variable.__rtruediv__ = rdiv
+Variable.__pow__ = pow
 ############### Testing stage #####################
 
 # to test with no backpropogation
