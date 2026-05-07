@@ -16,6 +16,7 @@ def using_config(name, value):
     finally:
         setattr(Config, name, old_value)
 
+
 def no_grad():
     """
     A way to use the context manager with the enable backpropagation mode
@@ -28,17 +29,18 @@ class Variable:
     """
     Variable class that only supports data from `ndarray` instances
     """
-    __array_priority__ = 200 # added priority (larger than 0 and 10)
+    __array_priority__ = 200  # added priority (larger than 0 and 10)
+
     def __init__(self, data, name=None):
-        if data is not None:   # added
+        if data is not None:  # added
             if not isinstance(data, np.ndarray):
                 raise TypeError('{} is not supported'.format(type(data)))
 
         self.data = data
         self.name = name
-        self.grad = None # add the corresponding gradient value
+        self.grad = None  # add the corresponding gradient value
         self.creator = None
-        self.generation = 0 # to get the correct order/priority
+        self.generation = 0  # to get the correct order/priority
 
     @property
     def shape(self):
@@ -59,7 +61,7 @@ class Variable:
     def __len__(self):
         return len(self.data)
 
-    def __repr__(self): # print
+    def __repr__(self):  # print
         if self.data is None:
             return 'variable(None)'
         p = str(self.data).replace('\n', '\n' + ' ' * 9)
@@ -67,9 +69,9 @@ class Variable:
 
     def set_creator(self, func):  # added the creator of the variable (function or non-function)
         self.creator = func
-        self.generation = func.generation + 1 # the generaion advances if there is a creator
+        self.generation = func.generation + 1  # the generaion advances if there is a creator
 
-    def cleargrad(self): # resets the derivatives stored in the variable.
+    def cleargrad(self):  # resets the derivatives stored in the variable.
         self.grad = None
 
     def backward(self, retain_grad=False):
@@ -81,10 +83,10 @@ class Variable:
         """
         # for the user to omit y.grad = np.array(1.0)
         if self.grad is None:  # added
-            self.grad = np.ones_like(self.data) # creates a derivative-> =1
+            self.grad = np.ones_like(self.data)  # creates a derivative-> =1
 
         funcs = []
-        seen_set = set() # purpose = to prevent the same function from being added to the list more than once
+        seen_set = set()  # purpose = to prevent the same function from being added to the list more than once
 
         def add_func(f):
             """
@@ -101,25 +103,27 @@ class Variable:
 
         while funcs:
             f = funcs.pop()  # 1. Get a function
-            gys = [output().grad for output in f.outputs] # Summarise the derivatives of the output variables in the list
+            gys = [output().grad for output in
+                   f.outputs]  # Summarise the derivatives of the output variables in the list
             # the output is weakref
 
-            gxs = f.backward(*gys)    # call backpropagation and unwrap the list
+            gxs = f.backward(*gys)  # call backpropagation and unwrap the list
             if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
                 gxs = (gxs,)
 
-            for x, gx in zip(f.inputs, gxs): # set the derivate in the backpropagation to the grad variable
+            for x, gx in zip(f.inputs, gxs):  # set the derivate in the backpropagation to the grad variable
                 if x.grad is None:
                     x.grad = gx
                 else:
                     x.grad = x.grad + gx
 
                 if x.creator is not None:
-                    add_func(x.creator) # 4. add previous functions to the list
+                    add_func(x.creator)  # 4. add previous functions to the list
 
                 if not retain_grad:  # added!
                     for y in f.outputs:
                         y().grad = None  # y is weakref
+
 
 def as_array(x):
     """
@@ -145,7 +149,7 @@ def as_variable(obj):
 
 
 class Function:
-    def __call__(self, *inputs): # Asterisk for any number of arguments
+    def __call__(self, *inputs):  # Asterisk for any number of arguments
         """
         Retrieves data from the Variable and saving the calculation results to the Variable.
         :param inputs:
@@ -153,26 +157,27 @@ class Function:
         """
         inputs = [as_variable(input) for input in inputs]
 
-        xs = [x.data for x in inputs] # to support multiple inputs and outputs
+        xs = [x.data for x in inputs]  # to support multiple inputs and outputs
         ys = self.forward(*xs)  # concrete calculation is implemented in forward method
         if not isinstance(ys, tuple):  # added
             ys = (ys,)
-        outputs = [Variable(as_array(y)) for y in ys]   # wrap data
+        outputs = [Variable(as_array(y)) for y in ys]  # wrap data
 
-        if Config.enable_backprop: # if backpropagation is active
-            self.generation = max([x.generation for x in inputs]) # set generations
-            for output in outputs: # loops for creator records
+        if Config.enable_backprop:  # if backpropagation is active
+            self.generation = max([x.generation for x in inputs])  # set generations
+            for output in outputs:  # loops for creator records
                 output.set_creator(self)  # Set parent(function); let the output variable save its creator; reference
             self.inputs = inputs  # save input variables
             self.outputs = [weakref.ref(output) for output in outputs]  # weak reference to exclude a circular reference
 
         return outputs if len(outputs) > 1 else outputs[0]
 
-    def forward(self, xs): # forward function of the base class
+    def forward(self, xs):  # forward function of the base class
         raise NotImplementedError()
 
     def backward(self, gys):  # backward function of the base class
         raise NotImplementedError()
+
 
 ########## Multiplication ###########
 class Mul(Function):
@@ -184,6 +189,7 @@ class Mul(Function):
         x0, x1 = self.inputs[0].data, self.inputs[1].data
         return gy * x1, gy * x0
 
+
 def mul(x0, x1):
     """
     Multiplication in TensorSlow
@@ -193,6 +199,7 @@ def mul(x0, x1):
     """
     x1 = as_array(x1)
     return Mul()(x0, x1)
+
 
 ########## Square ###############
 class Square(Function):
@@ -209,6 +216,7 @@ class Square(Function):
         gx = 2 * x * gy
         return gx
 
+
 def square(x):
     """
     To make square to a python function
@@ -216,6 +224,7 @@ def square(x):
     :return:
     """
     return Square()(x)
+
 
 ########### Exp ######################
 class Exp(Function):
@@ -232,6 +241,7 @@ class Exp(Function):
         gx = np.exp(x) * gy
         return gx
 
+
 def exp(x):
     """
     to make exponential to a python function
@@ -239,6 +249,7 @@ def exp(x):
     :return:
     """
     return Exp()(x)
+
 
 ######### Numerical differentiation - in contrast to automatic backpropagation #####
 def numerical_diff(f, x, eps=1e-4):
@@ -256,17 +267,20 @@ def numerical_diff(f, x, eps=1e-4):
     y1 = f(x1)
     return (y1.data - y0.data) / (2 * eps)
 
+
 ############ Addition ######################
 class Add(Function):
     """
     Performs the addition of two variables
     """
+
     def forward(self, x0, x1):
         y = x0 + x1
         return y
 
     def backward(self, gy):
         return gy, gy
+
 
 def add(x0, x1):
     """
@@ -275,10 +289,55 @@ def add(x0, x1):
     :param x1:
     :return:
     """
-    x1 = as_array(x1) # -> ndarray
+    x1 = as_array(x1)  # -> ndarray
     return Add()(x0, x1)
 
 
+########### Subtraction #################
+class Sub(Function):
+    def forward(self, x0, x1):
+        y = x0 - x1
+        return y
+
+    def backward(self, gy):
+        return gy, -gy
+
+
+def sub(x0, x1):
+    x1 = as_array(x1)
+    return Sub()(x0, x1)
+
+
+def rsub(x0, x1):
+    x1 = as_array(x1)
+    return Sub()(x1, x0)  # swap x1 and x0
+
+
+########### Negative operator ##############
+class Neg(Function):
+    """
+    If something is multiplied by -1 and passed downstream
+    """
+
+    def forward(self, x):
+        return -x
+
+    def backward(self, gy):
+        return -gy
+
+
+def neg(x):
+    return Neg()(x)
+
+
+######### Operator overloading #######
+Variable.__add__ = add
+Variable.__radd__ = add
+Variable.__mul__ = mul
+Variable.__rmul__ = mul
+Variable.__neg__ = neg
+Variable.__sub__ = sub
+Variable.__rsub__ = rsub
 ############### Testing stage #####################
 
 # to test with no backpropogation
@@ -287,11 +346,9 @@ def add(x0, x1):
 #     y = square(x)
 #     print(y.data)
 
-Variable.__add__ = add
-Variable.__radd__ = add
-Variable.__mul__ = mul
-Variable.__rmul__ = mul
 
 x = Variable(np.array(2.0))
-y = 3.0 * x + 1.0
-print(y)
+y1 = 2.0 - x
+y2 = x - 1.0
+print(y1)
+print(y2)
