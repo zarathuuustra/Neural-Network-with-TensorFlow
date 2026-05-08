@@ -1,7 +1,7 @@
 import numpy as np
 import weakref
 import contextlib
-
+import TensorSlow
 
 class Config:  # a way to enable/disable backpropagation mode
     enable_backprop = True
@@ -73,6 +73,16 @@ class Variable:
 
     def cleargrad(self):  # resets the derivatives stored in the variable.
         self.grad = None
+
+    def reshape(self, *shape):
+        """
+        Adjusts the shape parameter of the variable
+        :param shape:
+        :return:
+        """
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+           shape = shape[0]
+        return TensorSlow.functions.reshape(self, shape)
 
     def backward(self, retain_grad=False, create_graph=False):
         """
