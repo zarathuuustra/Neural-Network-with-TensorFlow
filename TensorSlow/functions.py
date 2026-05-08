@@ -1,7 +1,7 @@
 import numpy as np
 import TensorSlow
 from TensorSlow.core import Function, as_variable
-from TensorSlow import utils
+from TensorSlow import cuda, utils
 
 ###### Sinus ################
 class Sin(Function):
@@ -188,3 +188,50 @@ def linear_simple(x, W, b=None):
     y = t + b
     t.data = None  # Release t.data (ndarray) for memory efficiency
     return y
+
+########### Exp ######################
+class Exp(Function):
+    """
+    Applies the natural exponential function to the input.
+    """
+
+    def forward(self, x):
+        y = np.exp(x)
+        return y
+
+    def backward(self, gy):
+        x = self.input.data
+        gx = np.exp(x) * gy
+        return gx
+
+
+def exp(x):
+    """
+    to make exponential to a python function
+    :param x:
+    :return:
+    """
+    return Exp()(x)
+
+
+def sigmoid_simple(x):
+    x = as_variable(x)
+    y = 1 / (1 + exp(-x))
+    return y
+
+
+class Sigmoid(Function):
+    def forward(self, x):
+        xp = cuda.get_array_module(x)
+        # y = 1 / (1 + xp.exp(-x))
+        y = xp.tanh(x * 0.5) * 0.5 + 0.5  # Better implementation
+        return y
+
+    def backward(self, gy):
+        y = self.outputs[0]()
+        gx = gy * y * (1 - y)
+        return gx
+
+
+def sigmoid(x):
+    return Sigmoid()(x)

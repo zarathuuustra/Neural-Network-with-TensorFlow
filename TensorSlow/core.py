@@ -290,30 +290,6 @@ def square(x):
     return Square()(x)
 
 
-########### Exp ######################
-class Exp(Function):
-    """
-    Applies the natural exponential function to the input.
-    """
-
-    def forward(self, x):
-        y = np.exp(x)
-        return y
-
-    def backward(self, gy):
-        x = self.input.data
-        gx = np.exp(x) * gy
-        return gx
-
-
-def exp(x):
-    """
-    to make exponential to a python function
-    :param x:
-    :return:
-    """
-    return Exp()(x)
-
 ########### Power operator ###############
 class Pow(Function):
     def __init__(self, c):
@@ -435,6 +411,8 @@ def setup_variable():
     Variable.__truediv__ = div
     Variable.__rtruediv__ = rdiv
     Variable.__pow__ = pow
+
+
 ############### Testing stage #####################
 
 # to test with no backpropogation
