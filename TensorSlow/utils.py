@@ -4,7 +4,7 @@ import urllib.request
 import numpy as np
 from TensorSlow import as_variable
 from TensorSlow import Variable
-from tensorslow import cuda
+from TensorSlow import cuda
 
 
 # =============================================================================

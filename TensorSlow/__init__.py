@@ -1,4 +1,7 @@
 from TensorSlow.core import setup_variable
+from TensorSlow.core import as_variable
+from TensorSlow.core import Variable
+import TensorSlow.cuda
 import TensorSlow.functions
 
 # control core file setting (True from unit-3 to 4)
