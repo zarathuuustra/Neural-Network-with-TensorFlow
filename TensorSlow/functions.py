@@ -1,5 +1,5 @@
 import numpy as np
-from TensorSlow.core import Function
+from TensorSlow.core import Function, as_variable
 
 ###### Sinus ################
 class Sin(Function):
@@ -44,3 +44,29 @@ class Tanh(Function):
 
 def tanh(x):
     return Tanh()(x)
+
+########## Tensor operations ##################
+
+class Reshape(Function):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def forward(self, x):
+        self.x_shape = x.shape
+        y = x.reshape(self.shape)
+        return y
+
+    def backward(self, gy):
+        return reshape(gy, self.x_shape)
+
+
+def reshape(x, shape):
+    """
+    To make sure that the shape of the variable data is consistent with the shape of the gradient
+    :param x: input variable
+    :param shape: shape of the variable
+    :return:
+    """
+    if x.shape == shape:
+        return as_variable(x)
+    return Reshape(shape)(x)
