@@ -32,3 +32,21 @@ class Optimizer:
 
     def add_hook(self, f):
         self.hooks.append(f)
+
+
+# =============================================================================
+# SGD / MomentumSGD / AdaGrad / AdaDelta / Adam
+# =============================================================================
+
+
+class SGD(Optimizer):
+    """
+    Stochastic Gradient Descent: Class that updates the parameters using gradient descent
+    Stochastic here means randomly selecting data from the object data and applying gradient descent to the selected data
+    """
+    def __init__(self, lr=0.01):
+        super().__init__()
+        self.lr = lr
+
+    def update_one(self, param):
+        param.data -= self.lr * param.grad.data

@@ -3,6 +3,7 @@ from TensorSlow.core import as_variable
 from TensorSlow.core import Variable
 from TensorSlow.layers import Layer
 import TensorSlow.cuda
+import TensorSlow.models
 import TensorSlow.functions
 
 
