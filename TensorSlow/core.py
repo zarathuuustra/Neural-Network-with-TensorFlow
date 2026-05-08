@@ -159,6 +159,9 @@ class Variable:
                         y().grad = None  # y is weakref
 
 
+class Parameter(Variable):
+    pass
+
 def as_array(x, array_module=np):
     """
     If the value of the input is a scalar, convert it to an array.
