@@ -84,6 +84,26 @@ class Variable:
            shape = shape[0]
         return TensorSlow.functions.reshape(self, shape)
 
+    def transpose(self, *axes): #might be buggy because of the axes problem
+        """
+        Transpose method
+        :param axes: Number of axes
+        :return:
+        """
+        if len(axes) == 0:
+           axes = None
+        elif len(axes) == 1:
+           if isinstance(axes[0], (tuple, list)) or axes[0] is None:
+              axes = axes[0]
+        return TensorSlow.functions.transpose(self, axes)
+
+    @property
+    def T(self): # Instance variable
+       return TensorSlow.functions.transpose(self)
+
+    def sum(self, axis=None, keepdims=False):
+        return TensorSlow.functions.sum(self, axis, keepdims)
+
     def backward(self, retain_grad=False, create_graph=False):
         """
 
