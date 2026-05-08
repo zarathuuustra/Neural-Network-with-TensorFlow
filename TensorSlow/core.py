@@ -74,16 +74,18 @@ class Variable:
     def cleargrad(self):  # resets the derivatives stored in the variable.
         self.grad = None
 
-    def backward(self, retain_grad=False):
+    def backward(self, retain_grad=False, create_graph=False):
         """
 
         :param retain_grad: if true = gradients retain derivates;
         if false = derivates of intermediate variables is reset
+        :param create_graph: if true = create graph
         :return:
         """
         # for the user to omit y.grad = np.array(1.0)
         if self.grad is None:  # added
-            self.grad = np.ones_like(self.data)  # creates a derivative-> =1
+            # self.grad = np.ones_like(self.data)  # creates a derivative-> =1
+            self.grad = Variable(np.ones_like(self.data)) # reference to a Variable instance
 
         funcs = []
         seen_set = set()  # purpose = to prevent the same function from being added to the list more than once
@@ -103,24 +105,26 @@ class Variable:
 
         while funcs:
             f = funcs.pop()  # 1. Get a function
-            gys = [output().grad for output in
-                   f.outputs]  # Summarise the derivatives of the output variables in the list
+
+            ###### backpropagation ################
+            gys = [output().grad for output in f.outputs]  # Summarise the derivatives of the output variables in the list
             # the output is weakref
 
-            gxs = f.backward(*gys)  # call backpropagation and unwrap the list
-            if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
-                gxs = (gxs,)
+            with using_config ('enable_backprop', create_graph):
+                gxs = f.backward(*gys)  # call backpropagation and unwrap the list
+                if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
+                    gxs = (gxs,)
 
-            for x, gx in zip(f.inputs, gxs):  # set the derivate in the backpropagation to the grad variable
-                if x.grad is None:
-                    x.grad = gx
-                else:
-                    x.grad = x.grad + gx
+                for x, gx in zip(f.inputs, gxs):  # set the derivate in the backpropagation to the grad variable
+                    if x.grad is None:
+                        x.grad = gx
+                    else:
+                        x.grad = x.grad + gx
 
-                if x.creator is not None:
-                    add_func(x.creator)  # 4. add previous functions to the list
+                    if x.creator is not None:
+                        add_func(x.creator)  # 4. add previous functions to the list
 
-                if not retain_grad:  # added!
+                if not retain_grad:
                     for y in f.outputs:
                         y().grad = None  # y is weakref
 
@@ -156,7 +160,7 @@ class Function:
         :return:
         """
         inputs = [as_variable(input) for input in inputs]
-
+        ####### forward propagation ##############
         xs = [x.data for x in inputs]  # to support multiple inputs and outputs
         ys = self.forward(*xs)  # concrete calculation is implemented in forward method
         if not isinstance(ys, tuple):  # added
@@ -165,6 +169,7 @@ class Function:
 
         if Config.enable_backprop:  # if backpropagation is active
             self.generation = max([x.generation for x in inputs])  # set generations
+        #### create links ##############
             for output in outputs:  # loops for creator records
                 output.set_creator(self)  # Set parent(function); let the output variable save its creator; reference
             self.inputs = inputs  # save input variables
@@ -186,7 +191,7 @@ class Mul(Function):
         return y
 
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         return gy * x1, gy * x0
 
 
@@ -208,7 +213,7 @@ class Div(Function):
         return y
 
     def backward(self, gy):
-        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        x0, x1 = self.inputs
         gx0 = gy / x1
         gx1 = gy * (-x0 / x1 ** 2)
         return gx0, gx1
@@ -281,7 +286,7 @@ class Pow(Function):
         return y
 
     def backward(self, gy):
-        x = self.inputs[0].data
+        x, = self.inputs
         c = self.c
         gx = c * x ** (c - 1) * gy
         return gx
