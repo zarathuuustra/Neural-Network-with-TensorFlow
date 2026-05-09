@@ -5,6 +5,7 @@ from TensorSlow.layers import Layer
 import TensorSlow.cuda
 import TensorSlow.models
 import TensorSlow.functions
+import TensorSlow.datasets
 
 
 # control core file setting (True from unit-3 to 4)
