@@ -6,6 +6,7 @@ import TensorSlow.cuda
 import TensorSlow.models
 import TensorSlow.functions
 import TensorSlow.datasets
+from TensorSlow.dataloaders import DataLoader
 
 
 # control core file setting (True from unit-3 to 4)

@@ -1,6 +1,6 @@
 import numpy as np
 import TensorSlow
-from TensorSlow.core import Function, as_variable
+from TensorSlow.core import Function, Variable,as_variable, as_array
 from TensorSlow import cuda, utils
 
 ###### Sinus ################
@@ -420,3 +420,19 @@ class SoftmaxCrossEntropy(Function):
 
 def softmax_cross_entropy(x, t):
     return SoftmaxCrossEntropy()(x, t)
+
+
+def accuracy(y, t):
+    """
+    The accuracy function is used to calculate the “correctness” of the parameter `y` with respect to `t`.
+    The two parameters are either Variable instances or ndarray instances.
+    :param y: prediction of the neural network
+    :param t: the data of the correct answer
+    :return:
+    """
+    y, t = as_variable(y), as_variable(t)
+
+    pred = y.data.argmax(axis=1).reshape(t.shape)
+    result = (pred == t.data)
+    acc = result.mean()
+    return Variable(as_array(acc))
