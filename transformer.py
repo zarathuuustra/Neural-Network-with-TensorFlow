@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F # layers, loss functions, so
 import torch.optim as optim
+from torch.nn import TransformerEncoderLayer
 from torch.utils.data import DataLoader # batchfile
 from torchvision import datasets, transforms
 import torchvision
@@ -156,4 +157,22 @@ class TransformerEncoder (nn.Module):
         x = x + self.mlp(self.norm2(x))
         return x
 
+class VisionTransformer(nn.Module):
+    def __init__(self, img_size, patch_size, in_channels, num_classes, embed_dim, depth, num_heads, mlp_dim, drop_rate):
+        super().__init__()
+        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
+        # Sequential -> when the data through the Sequential class it will go through it Layer by Layer
+        self.encoder = nn.Sequential([
+            TransformerEncoderLayer(embed_dim, num_heads, mlp_dim, drop_rate)
+            for _ in range(depth)
+        ])
+        self.norm = nn.LayerNorm(embed_dim)
+        self.head = nn.Linear(embed_dim, num_classes)  # act as a classifier
+
+    def forward(self, x):
+        x = self.patch_embed(x)
+        x = self.encoder(x)
+        x = self.norm(x)
+        cls_token = x[:, 0]
+        return self.head(cls_token)
 
