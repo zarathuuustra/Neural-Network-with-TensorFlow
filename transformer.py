@@ -116,13 +116,13 @@ class PatchEmbedding(nn.Module):
         num_patches = (img_size // patch_size) ** 2
         self.cls_token = nn.Parameter(torch.randn(1,1, embed_dim))
         # special vector we want to train in the training phase
-        self.pos_embed = nn.Parameter(torch.randn(1,1 + num_patches), embed_dim)
+        self.pos_embed = nn.Parameter(torch.randn(1,1 + num_patches, embed_dim))
 
     def forward(self, x: torch.Tensor):
         B = x.size(0)
         x = self.proj(x) # (B, E, H/P, W/P)
         x = x.flatten(2).transpose(1, 2) # to make sure the shapes align -> (B, N, E)
-        cls_token = self.cls_token( B, -1, -1)
+        cls_token = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_token, x), dim=1)
         x = x + self.pos_embed
         return x
@@ -144,7 +144,7 @@ class MLP(nn.Module):
         x = self.dropout(self.fc2(x))
         return x
 
-class TransformerEncoder (nn.Module):
+class TransformerEncoder(nn.Module):
     def __init__(self, embed_dim, num_heads, mlp_dim, drop_rate):
         super().__init__()
         self.norm1 = nn.LayerNorm(embed_dim)
@@ -162,7 +162,7 @@ class VisionTransformer(nn.Module):
         super().__init__()
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
         # Sequential -> when the data through the Sequential class it will go through it Layer by Layer
-        self.encoder = nn.Sequential([
+        self.encoder = nn.Sequential(*[
             TransformerEncoderLayer(embed_dim, num_heads, mlp_dim, drop_rate)
             for _ in range(depth)
         ])
@@ -176,3 +176,55 @@ class VisionTransformer(nn.Module):
         cls_token = x[:, 0]
         return self.head(cls_token)
 
+# Instantiate model
+
+# specified parameters; in order;
+model = VisionTransformer(
+    IMAGE_SIZE, PATCH_SIZE, CHANNELS, NUM_CLASSES,
+    EMBED_DIM, DEPTH, NUM_HEADS, MLP_DIM, DROP_RATE
+).to(device) # move to the target device
+print(model)
+
+## 9. Defining a Loss function and optimizer
+
+criterion = nn.CrossEntropyLoss() # Measure how wrong our model is
+optimizer = torch.optim.Adam(params=model.parameters(), # update our models paraments
+                             lr = LEARNING_RATE)
+
+
+## 10. Defining a Training Loop function
+
+def train(model, loader, optimizer, criterion):
+    # Set the mode of the model into training
+    model.train()
+
+    total_loss, correct = 0, 0
+    # x = batch of images/photos; y = batch of labels or targets
+    for x,y in loader:
+        # Moving (sending) our data to target device
+        x, y = x.to(device), y.to(device) # load to cuda device
+        optimizer.zero_grad()
+        # 1. Forward pass (model outputs raw logits)
+        out = model(x) # batch of pictures
+        # 2. Calculate the loss (per batch)
+        loss = criterion(out, y)
+        # 3. Perform backpropagation
+        loss.backward()
+        # 4. Perform Gradient Descent
+        optimizer.step()
+
+        total_loss += loss.item() * x.size(0)
+        correct = correct + (out.argmax(1) == y).sum().item() # Fehlerquelle?
+
+    # You have to scale the loss (Normalization step to make the loss general across all batches
+    return total_loss / len(loader), correct / len(loader.dataset )
+
+def evaluate(model, loader):
+    model.eval() # Set the mode of the model into evaluation
+    correct = 0
+    with torch.inference_mode():
+        for x,y in loader:
+            x, y = x.to(device), y.to(device)  # move to target device
+            out = model(x)
+            correct += (out.argmax(dim=1) == y).sum().item()
+        return correct / len(loader.dataset)
