@@ -1,3 +1,18 @@
+"""
+Building a Vision Transformer from Scratch:
+1. Reading the paper "Attention is all you need"
+2. Building a Vision Transformer with a YouTube-Video
+3. Apply the concepts of the video on the framework used in the seminar
+4. Write the paper for the seminar "Build Your Own Neural Network" by the end of May
+
+Sources:
+Building a Vision Transformer Model from Scratch with PyTorch
+Video on YouTube: https://www.youtube.com/watch?v=7o1jpvapaT0
+GitHub page is: https://github.com/MOHAMMEDFAHD/Pytorch-Collections/tree/main/vision-transformer
+"""
+
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F # layers, loss functions, so
