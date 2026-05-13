@@ -1,6 +1,6 @@
 from TensorSlow.core import setup_variable
 from TensorSlow.core import as_variable
-from TensorSlow.core import Variable
+from TensorSlow.core import Variable, Parameter
 from TensorSlow.layers import Layer
 import TensorSlow.cuda
 import TensorSlow.models
