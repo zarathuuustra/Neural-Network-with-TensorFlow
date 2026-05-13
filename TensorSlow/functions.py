@@ -451,3 +451,22 @@ class ReLU(Function):
 
 def relu(x):
     return ReLU()(x)
+
+# =============================================================================
+# conv2d / col2im / im2col / basic_math
+# =============================================================================
+from TensorSlow.functions_conv import conv2d
+from TensorSlow.functions_conv import deconv2d
+from TensorSlow.functions_conv import conv2d_simple
+from TensorSlow.functions_conv import im2col
+from TensorSlow.functions_conv import col2im
+from TensorSlow.functions_conv import pooling_simple
+from TensorSlow.functions_conv import pooling
+from TensorSlow.functions_conv import average_pooling
+from TensorSlow.core import add
+from TensorSlow.core import sub
+from TensorSlow.core import rsub
+from TensorSlow.core import mul
+from TensorSlow.core import div
+from TensorSlow.core import neg
+from TensorSlow.core import pow
