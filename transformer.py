@@ -39,26 +39,26 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 random.seed(42)
 
-## 3. Setting the hyperparameters
+## 4. Setting the hyperparameters
 
-BATCH_SIZE = 128
+BATCH_SIZE = 16 # CPU optimiert 32 # instead of 128
 EPOCHS = 10
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 2e-3 # CPU optimiert 1e-3 # instead of 3e-4
 PATCH_SIZE = 4 # like tokens
 NUM_CLASSES = 10
 IMAGE_SIZE = 32
 CHANNELS = 3 # 3 color channels
-EMBED_DIM = 256
-NUM_HEADS = 8
-DEPTH = 6
-MLP_DIM = 512
-DROP_RATE = 0.1
+EMBED_DIM = 64 # Cpu optimiert 128 # instead of 256
+NUM_HEADS = 2 # CPU optimiert 4 # instead of 8
+DEPTH = 2 # CPU optimiert 3 # instead of 6
+MLP_DIM = 128 # CPU optimiert 256 # instead of 512
+DROP_RATE = 0.2 # instead of 0.1
 
 # 5. Define Image Transformations
 
 transform = transforms.Compose([
     transforms.ToTensor(), # we need to convert our image to tensors
-    transforms.Normalize((0.5,), (0.5,))
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     # 1. Helps the model to converge faster
     # 2. Helps to make he numerical computations stable
 ])
@@ -105,23 +105,32 @@ class PatchEmbedding(nn.Module):
                  img_size,
                  patch_size,
                  in_channels,
-                 embed_dim ):
+                 embed_dim):
         super().__init__()
-        self.patch_size = patch_size # # Convolution 2D layer;
+        self.patch_size = patch_size  # # Convolution 2D layer;
         # kernel= feature detector; stride = steps, how many pixels you want to move over
         self.proj = nn.Conv2d(in_channels=in_channels,
                               out_channels=embed_dim,
                               kernel_size=patch_size,
                               stride=patch_size)
         num_patches = (img_size // patch_size) ** 2
-        self.cls_token = nn.Parameter(torch.randn(1,1, embed_dim))
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         # special vector we want to train in the training phase
-        self.pos_embed = nn.Parameter(torch.randn(1,1 + num_patches, embed_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, 1 + num_patches, embed_dim))
+
+        self.init_weights()
+
+    def init_weights(self):
+        nn.init.trunc_normal_(self.cls_token, std=0.02)
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        nn.init.trunc_normal_(self.proj.weight, std=0.02)
+        if self.proj.bias is not None:
+            nn.init.zeros_(self.proj.bias)
 
     def forward(self, x: torch.Tensor):
         B = x.size(0)
-        x = self.proj(x) # (B, E, H/P, W/P)
-        x = x.flatten(2).transpose(1, 2) # to make sure the shapes align -> (B, N, E)
+        x = self.proj(x)  # (B, E, H/P, W/P)
+        x = x.flatten(2).transpose(1, 2)  # to make sure the shapes align -> (B, N, E)
         cls_token = self.cls_token.expand(B, -1, -1)
         x = torch.cat((cls_token, x), dim=1)
         x = x + self.pos_embed
@@ -153,7 +162,11 @@ class TransformerEncoder(nn.Module):
         self.mlp = MLP(embed_dim, mlp_dim, drop_rate)
 
     def forward (self, x):
-        x = x + self.attn(self.norm1(x), self.norm2(x), self.norm1(x)[0])
+        # Self-Attention
+        attn_out, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x))
+        x = x + attn_out
+
+        # MLP
         x = x + self.mlp(self.norm2(x))
         return x
 
@@ -163,7 +176,7 @@ class VisionTransformer(nn.Module):
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
         # Sequential -> when the data through the Sequential class it will go through it Layer by Layer
         self.encoder = nn.Sequential(*[
-            TransformerEncoderLayer(embed_dim, num_heads, mlp_dim, drop_rate)
+            TransformerEncoder(embed_dim, num_heads, mlp_dim, drop_rate)
             for _ in range(depth)
         ])
         self.norm = nn.LayerNorm(embed_dim)
@@ -188,7 +201,7 @@ print(model)
 ## 9. Defining a Loss function and optimizer
 
 criterion = nn.CrossEntropyLoss() # Measure how wrong our model is
-optimizer = torch.optim.Adam(params=model.parameters(), # update our models paraments
+optimizer = torch.optim.AdamW(params=model.parameters(), # update our models paraments
                              lr = LEARNING_RATE)
 
 
@@ -217,14 +230,26 @@ def train(model, loader, optimizer, criterion):
         correct = correct + (out.argmax(1) == y).sum().item() # Fehlerquelle?
 
     # You have to scale the loss (Normalization step to make the loss general across all batches
-    return total_loss / len(loader), correct / len(loader.dataset )
+    return total_loss / len(loader.dataset), correct / len(loader.dataset )
 
 def evaluate(model, loader):
     model.eval() # Set the mode of the model into evaluation
     correct = 0
-    with torch.inference_mode():
+    with torch.no_grad():
         for x,y in loader:
             x, y = x.to(device), y.to(device)  # move to target device
             out = model(x)
             correct += (out.argmax(dim=1) == y).sum().item()
         return correct / len(loader.dataset)
+
+## Training
+# from tqdm.auto import tqdm
+train_accuracies , test_accuracies = [], []
+
+for epoch in range(EPOCHS):
+    train_loss, train_accuracy = train(model, train_loader, optimizer, criterion)
+    test_acc = evaluate(model, test_loader)
+    train_accuracies.append(train_accuracy)
+    test_accuracies.append(test_acc)
+    print(f"Epoch: {epoch+1}/{EPOCHS}, train loss {train_loss:.3f}, "
+          f"Train accuracy {train_accuracy:.4f}%, Test accuracy: {test_acc:.4f} ")
