@@ -19,6 +19,9 @@ class DataLoader:
 
         self.reset()
 
+    def __len__(self) -> int:
+        return math.ceil(len(self.dataset) / self.batch_size)
+
     def reset(self):
         self.iteration = 0
         if self.shuffle:

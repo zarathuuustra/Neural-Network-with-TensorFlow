@@ -261,7 +261,7 @@ class AveragePooling(Function):
         return y
 
     def backward(self, gy):
-        # TODO(Koki): This is simple implementation
+        # This is simple implementation
         N, C, OH, OW = gy.shape
         KW, KH = pair(self.kernel_size)
         gy /= (KW*KH)

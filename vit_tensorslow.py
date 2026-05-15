@@ -24,8 +24,9 @@ import math
 
 # ------------------------
 
-# Training the MNIST-Dataset with ReLU
-## 4. Setting the hyperparameters
+# Training a Vision Transformer with the CIFAR10 dataset
+
+## Setting the hyperparameters
 BATCH_SIZE = 16 # CPU optimiert 32 # instead of 128
 EPOCHS = 10
 LEARNING_RATE = 2e-3 # CPU optimiert 1e-3 # instead of 3e-4
@@ -39,47 +40,89 @@ DEPTH = 2 # CPU optimiert 3 # instead of 6
 MLP_DIM = 128 # CPU optimiert 256 # instead of 512
 DROP_RATE = 0.2 # instead of 0.1
 
-train_set = TensorSlow.datasets.CIFAR10(train=True)
-test_set = TensorSlow.datasets.CIFAR10(train=False)
-train_loader = DataLoader(train_set, batch_size)
-test_loader = DataLoader(test_set, batch_size, shuffle=False)
-
+# Define Image Transformations
 
 transform = TensorSlow.transforms.Compose([
     TensorSlow.transforms.ToArray(),
     TensorSlow.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
-# model = MLP((hidden_size, 10))
-model = MLP((hidden_size, hidden_size, 10), activation=F.relu)
-optimizer = optimizers.SGD().setup(model)  # default lr=0.01
 
-for epoch in range(max_epoch):
-    sum_loss, sum_acc = 0, 0
+# Getting a dataset
+train_set = TensorSlow.datasets.CIFAR10(train=True)
+test_set = TensorSlow.datasets.CIFAR10(train=False)
 
-    for x, t in train_loader:
-        y = model(x)
-        loss = F.softmax_cross_entropy(y, t)
-        acc = F.accuracy(y, t)
-        model.cleargrads()
-        loss.backward()
-        optimizer.update()
+print(len(train_set))
+print(len(test_set))
 
-        sum_loss += float(loss.data) * len(t)
-        sum_acc += float(acc.data) * len(t)
+train_loader = DataLoader(train_set, BATCH_SIZE, shuffle=True)
+test_loader = DataLoader(test_set, BATCH_SIZE, shuffle=False)
 
-    print('epoch: {}'.format(epoch + 1))
-    print('train loss: {:.4f}, accuracy: {:.2f}'.format(
-        sum_loss / len(train_set), sum_acc / len(train_set)))
+print(f"DataLoader: {train_loader, test_loader}")
+print(f"Length of train_loader: {len(train_loader)} batches of {BATCH_SIZE}...")
+print(f"Length of test_loader: {len(test_loader)} batches of {BATCH_SIZE}...")
 
-    sum_loss, sum_acc = 0, 0
-    with TensorSlow.no_grad():
-        for x, t in test_loader:
-            y = model(x)
-            loss = F.softmax_cross_entropy(y, t)
-            acc = F.accuracy(y, t)
 
-            sum_loss += float(loss.data) * len(t)
-            sum_acc += float(acc.data) * len(t)
+class PatchEmbedding(Layer):
 
-    print('test loss: {:.4f}, accuracy: {:.2f}'.format(
-        sum_loss / len(test_set), sum_acc / len(test_set)))
+    def __init__(self, img_size, patch_size, in_channels, embed_dim):
+        super().__init__()
+
+        self.patch_size = patch_size
+        patch_dim = in_channels * patch_size * patch_size
+
+        self.proj = L.Linear(
+            out_size=embed_dim,
+            in_size=patch_dim
+        )
+
+    def forward(self, x):
+
+        patches = F.im2col(
+            x,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
+            pad=0,
+            to_matrix=True
+        )
+
+        embeddings = self.proj(patches)
+
+        return embeddings
+
+#TODO: (Question) Do I need to move the Vision Transformer to the CPU? How does it work here?
+
+# # model = MLP((hidden_size, 10))
+# model = MLP((hidden_size, hidden_size, 10), activation=F.relu)
+# optimizer = optimizers.SGD().setup(model)  # default lr=0.01
+#
+#
+# for epoch in range(max_epoch):
+#     sum_loss, sum_acc = 0, 0
+#
+#     for x, t in train_loader:
+#         y = model(x)
+#         loss = F.softmax_cross_entropy(y, t)
+#         acc = F.accuracy(y, t)
+#         model.cleargrads()
+#         loss.backward()
+#         optimizer.update()
+#
+#         sum_loss += float(loss.data) * len(t)
+#         sum_acc += float(acc.data) * len(t)
+#
+#     print('epoch: {}'.format(epoch + 1))
+#     print('train loss: {:.4f}, accuracy: {:.2f}'.format(
+#         sum_loss / len(train_set), sum_acc / len(train_set)))
+#
+#     sum_loss, sum_acc = 0, 0
+#     with TensorSlow.no_grad():
+#         for x, t in test_loader:
+#             y = model(x)
+#             loss = F.softmax_cross_entropy(y, t)
+#             acc = F.accuracy(y, t)
+#
+#             sum_loss += float(loss.data) * len(t)
+#             sum_acc += float(acc.data) * len(t)
+#
+#     print('test loss: {:.4f}, accuracy: {:.2f}'.format(
+#         sum_loss / len(test_set), sum_acc / len(test_set)))

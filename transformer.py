@@ -58,7 +58,7 @@ DROP_RATE = 0.2 # instead of 0.1
 
 transform = transforms.Compose([
     transforms.ToTensor(), # we need to convert our image to tensors
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) # normalize the values of the tensors to process them more efficiently
     # 1. Helps the model to converge faster
     # 2. Helps to make he numerical computations stable
 ])
@@ -108,7 +108,10 @@ class PatchEmbedding(nn.Module):
                  embed_dim):
         super().__init__()
         self.patch_size = patch_size  # # Convolution 2D layer;
-        # kernel= feature detector; stride = steps, how many pixels you want to move over
+        # kernel= feature detector; a small, learnable matrix or tensor used to extract features from input data
+
+        # stride = controls the step size of the convolution window (kernel) as it slides across the input tensor.
+        # It determines how many pixels the filter shifts horizontally and vertically after each operation
         self.proj = nn.Conv2d(in_channels=in_channels,
                               out_channels=embed_dim,
                               kernel_size=patch_size,
