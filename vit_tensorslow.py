@@ -74,6 +74,10 @@ class PatchEmbedding(Layer):
             out_size=embed_dim,
             in_size=patch_dim
         )
+        self.embed_dim = embed_dim
+        self.num_patches = (img_size // patch_size) ** 2
+        self.cls_token = Parameter(np.zeros((1, 1, embed_dim)))
+        self.pos_embed = Parameter(np.zeros((1, 1 + self.num_patches, embed_dim)))
 
     def forward(self, x):
 
@@ -87,11 +91,60 @@ class PatchEmbedding(Layer):
 
         embeddings = self.proj(patches)
 
-        return embeddings
+        b = x.shape[0]
+        embeddings = F.reshape(
+            embeddings,
+            (b, self.num_patches, self.embed_dim)
+        )
 
-#TODO: (Question) Do I need to move the Vision Transformer to the CPU? How does it work here?
+        cls_tokens = np.repeat(
+            self.cls_token.data,
+            b,
+            axis=0
+        )
 
-# # model = MLP((hidden_size, 10))
+        x = np.concatenate(
+            [cls_tokens, embeddings.data],
+            axis=1
+        )
+
+        x = x + self.pos_embed.data
+        # langfristig problematisch, da ich dadurch Gradienten und Autograd verliere
+        return x
+
+# MLP class is already in our framework
+
+class TransformerMLP(Layer):
+
+    def __init__(self,
+                 in_features,
+                 hidden_features):
+
+        super().__init__()
+
+        self.fc1 = L.Linear(
+            out_size=hidden_features,
+            in_size=in_features
+        )
+
+        self.fc2 = L.Linear(
+            out_size=in_features,
+            in_size=hidden_features
+        )
+
+    def forward(self, x):
+
+        x = self.fc1(x)
+
+        x = F.gelu(x)
+
+        x = self.fc2(x)
+
+        return x
+
+# TODO: Dropout fehlt noch, ist aber nicht zentral für das Architekturverständnis; kann man erst mal ohne machen
+
+# model = MLP((hidden_size, 10))
 # model = MLP((hidden_size, hidden_size, 10), activation=F.relu)
 # optimizer = optimizers.SGD().setup(model)  # default lr=0.01
 #

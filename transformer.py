@@ -106,7 +106,12 @@ class PatchEmbedding(nn.Module):
                  patch_size,
                  in_channels,
                  embed_dim):
+
         super().__init__()
+
+        # super() macht hier: - Parameter speichern; Gradienten berechnen
+        # .to(device) verwenden; Optimizer benutzen
+
         self.patch_size = patch_size  # # Convolution 2D layer;
         # kernel= feature detector; a small, learnable matrix or tensor used to extract features from input data
 

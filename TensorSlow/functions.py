@@ -452,6 +452,15 @@ class ReLU(Function):
 def relu(x):
     return ReLU()(x)
 
+def gelu(x):
+    """ Gelu Activation Function"""
+    return 0.5 * x * (
+        1 + tanh(
+            np.sqrt(2 / np.pi) *
+            (x + 0.044715 * (x ** 3))
+        )
+    )
+
 # =============================================================================
 # conv2d / col2im / im2col / basic_math
 # =============================================================================
