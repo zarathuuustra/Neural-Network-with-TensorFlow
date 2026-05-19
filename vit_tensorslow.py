@@ -15,7 +15,7 @@ from TensorSlow.utils import sum_to
 import TensorSlow.layers as L  # import as L
 from TensorSlow import Layer
 from TensorSlow import optimizers
-from TensorSlow.models import MLP
+from TensorSlow.models import MLP, SelfAttention
 from TensorSlow import DataLoader
 from TensorSlow.datasets import Spiral
 from common.nlp_util import (preprocess, create_contexts_target,convert_one_hot, MatMul, SoftmaxWithLoss,
@@ -142,7 +142,35 @@ class TransformerMLP(Layer):
 
         return x
 
+class TransformerEncoder(Layer):
+
+    def __init__(self,
+                 embed_dim,
+                 mlp_dim):
+
+        super().__init__()
+
+        self.attn = SelfAttention(embed_dim)
+
+        self.mlp = TransformerMLP(
+            in_features=embed_dim,
+            hidden_features=mlp_dim
+        )
+
+    def forward(self, x):
+
+        attn_out = self.attn(x)
+
+        x = x + attn_out
+
+        mlp_out = self.mlp(x)
+
+        x = x + mlp_out
+
+        return x
+
 # TODO: Dropout fehlt noch, ist aber nicht zentral für das Architekturverständnis; kann man erst mal ohne machen
+# TODO: Es fehlen außerdem: LayerNorm, MultiHeadAttention
 
 # model = MLP((hidden_size, 10))
 # model = MLP((hidden_size, hidden_size, 10), activation=F.relu)

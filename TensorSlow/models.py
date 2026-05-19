@@ -2,6 +2,7 @@ import TensorSlow.functions as F
 import TensorSlow.layers as L
 from TensorSlow.layers import Layer
 from TensorSlow import utils
+import numpy as np
 
 
 class Model(Layer):
@@ -38,3 +39,46 @@ class MLP(Model):
         for l in self.layers[:-1]:
             x = self.activation(l(x))
         return self.layers[-1](x)
+
+
+class SelfAttention(Layer):
+
+    def __init__(self, embed_dim):
+
+        super().__init__()
+
+        self.embed_dim = embed_dim
+
+        self.query = L.Linear(
+            out_size=embed_dim,
+            in_size=embed_dim
+        )
+
+        self.key = L.Linear(
+            out_size=embed_dim,
+            in_size=embed_dim
+        )
+
+        self.value = L.Linear(
+            out_size=embed_dim,
+            in_size=embed_dim
+        )
+
+    def forward(self, x):
+        Q = self.query(x)
+
+        K = self.key(x)
+
+        V = self.value(x)
+
+        K_t = F.transpose([K, (0, 2, 1)]) # könnte auch ein Tupel sein, nach ChatGPT
+
+        scores = F.batch_matmul(Q, K_t)
+
+        scores = scores / np.sqrt(self.embed_dim)
+
+        attention = F.softmax(scores, axis=-1)
+
+        output = F.batch_matmul(attention, V)
+
+        return output

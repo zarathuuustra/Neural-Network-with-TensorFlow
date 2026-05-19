@@ -160,6 +160,21 @@ class MatMul(Function):
 def matmul(x, W):
     return MatMul()(x, W)
 
+class BatchMatMul(Function):
+
+    def forward(self, x, W):
+
+        xp = cuda.get_array_module(x)
+
+        y = xp.matmul(x, W)
+
+        return y
+
+    def backward(self):
+        raise NotImplementedError
+
+def batch_matmul(x, W):
+    return BatchMatMul()(x, W)
 
 class Linear(Function):
     def forward(self, x, W, b):
