@@ -17,6 +17,7 @@ from TensorSlow import Layer
 from TensorSlow import optimizers
 from TensorSlow.models import MLP, SelfAttention
 from TensorSlow import DataLoader
+from TensorSlow.dataloaders import SeqDataLoader
 from TensorSlow.datasets import Spiral
 from common.nlp_util import (preprocess, create_contexts_target,convert_one_hot, MatMul, SoftmaxWithLoss,
                              create_contexts_target, convert_one_hot, Trainer, Adam)
@@ -146,7 +147,9 @@ class TransformerEncoder(Layer):
 
     def __init__(self,
                  embed_dim,
-                 mlp_dim):
+                 num_heads,
+                 mlp_dim,
+                 drop_rate):
 
         super().__init__()
 
@@ -168,6 +171,55 @@ class TransformerEncoder(Layer):
         x = x + mlp_out
 
         return x
+
+class VisionTransformer(Layer):
+    def __init__(self, img_size, patch_size, in_channels, num_classes, embed_dim, depth, num_heads, mlp_dim, drop_rate):
+        super().__init__()
+        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
+        # Sequential -> when the data goes through the Sequential class it will go through it Layer by Layer
+        self.encoders = []
+        for i in range (depth):
+            encoder = TransformerEncoder(
+                embed_dim,
+                num_heads,
+                mlp_dim,
+                drop_rate
+            )
+            setattr(self, f"encoder_{i}", encoder)
+
+            self.encoders.append(encoder)
+
+        # Different version of setting the Layer as Unterlayer
+        # self.encoders = [
+        #     TransformerEncoder(
+        #         embed_dim,
+        #         num_heads,
+        #         mlp_dim,
+        #         drop_rate
+        #     )
+        #     for _ in range(depth)
+        # ]
+        # self.norm = nn.LayerNorm(embed_dim) # noch keine LayerNorm
+
+        self.head = L.Linear(
+            out_size=num_classes,
+            in_size=embed_dim
+        )  # act as a classifier
+
+    def forward(self, x):
+        x = self.patch_embed(x)
+        for encoder in self.encoders:
+            x = encoder(x)
+        # x = self.norm(x) # Noch keine LayerNorm
+        cls_token = x[:, 0]
+        return self.head(cls_token)
+
+model = VisionTransformer(
+    IMAGE_SIZE, PATCH_SIZE, CHANNELS, NUM_CLASSES,
+    EMBED_DIM, DEPTH, NUM_HEADS, MLP_DIM, DROP_RATE
+)# move to the target device
+print(model)
+
 
 # TODO: Dropout fehlt noch, ist aber nicht zentral für das Architekturverständnis; kann man erst mal ohne machen
 # TODO: Es fehlen außerdem: LayerNorm, MultiHeadAttention

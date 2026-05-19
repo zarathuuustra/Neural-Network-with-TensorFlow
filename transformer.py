@@ -182,7 +182,7 @@ class VisionTransformer(nn.Module):
     def __init__(self, img_size, patch_size, in_channels, num_classes, embed_dim, depth, num_heads, mlp_dim, drop_rate):
         super().__init__()
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
-        # Sequential -> when the data through the Sequential class it will go through it Layer by Layer
+        # Sequential -> when the data goes through the Sequential class it will go through it Layer by Layer
         self.encoder = nn.Sequential(*[
             TransformerEncoder(embed_dim, num_heads, mlp_dim, drop_rate)
             for _ in range(depth)
