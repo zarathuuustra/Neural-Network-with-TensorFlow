@@ -73,6 +73,29 @@ def reshape(x, shape):
         return as_variable(x)
     return Reshape(shape)(x)
 
+class GetItem(Function):
+    """ Base class to support matrix slicing """
+    def __init__(self, slices):
+        self.slices = slices
+
+    def forward(self, x):
+        y = x[self.slices]
+        return y
+
+    def backward(self, gy):
+
+        x, = self.inputs
+
+        gx = np.zeros_like(x.data)
+
+        gx[self.slices] = gy.data
+
+        return Variable(gx)
+
+def get_item(x, slices):
+    """ Base function to support matrix slicing """
+    return GetItem(slices)(x)
+
 # alte Version des Transpose
 
 # class Transpose(Function):

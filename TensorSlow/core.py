@@ -42,6 +42,10 @@ class Variable:
         self.creator = None
         self.generation = 0  # to get the correct order/priority
 
+    def __getitem__(self, slices):
+        """ Base function inside the variable class to support index slicing """
+        return TensorSlow.functions.get_item(self, slices)
+
     @property
     def shape(self):
         return self.data.shape
