@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from TensorSlow.utils import sum_to
 import TensorSlow.layers as L  # import as L
 from TensorSlow import Layer
-from TensorSlow import optimizers
+from TensorSlow.optimizers import Adam as Ada
 from TensorSlow.models import MLP, SelfAttention
 from TensorSlow import DataLoader
 from TensorSlow.dataloaders import SeqDataLoader
@@ -219,6 +219,79 @@ model = VisionTransformer(
     EMBED_DIM, DEPTH, NUM_HEADS, MLP_DIM, DROP_RATE
 )# move to the target device
 print(model)
+
+## 9. Defining a Loss function and optimizer
+
+# Measure how wrong our model is
+criterion = F.softmax_cross_entropy
+
+# update our models paraments
+optimizer = Ada().setup(model)
+# Da TensorSlow aktuell kein AdamW-Optimizer hat wird derzeit der Adam-Optimizer benutzt
+
+## 10. Defining a Training Loop function
+
+train_accuracies = []
+test_accuracies = []
+
+for epoch in range(EPOCHS):
+
+    sum_loss = 0
+    sum_acc = 0
+
+    # TRAINING
+    for x, t in train_loader:
+
+        # Forward pass
+        y = model(x)
+
+        # Loss berechnen
+        loss = F.softmax_cross_entropy(y, t)
+
+        # Accuracy berechnen
+        acc = F.accuracy(y, t)
+
+        # Gradienten zurücksetzen
+        model.cleargrads()
+
+        # Backpropagation
+        loss.backward()
+
+        # Parameter updaten
+        optimizer.update()
+
+        # Statistik sammeln
+        sum_loss += float(loss.data) * len(t)
+        sum_acc += float(acc.data) * len(t)
+
+    train_loss = sum_loss / len(train_set)
+    train_acc = sum_acc / len(train_set)
+
+    train_accuracies.append(train_acc)
+
+    # TEST / EVALUATION
+    sum_test_acc = 0
+
+    with TensorSlow.no_grad():
+
+        for x, t in test_loader:
+
+            y = model(x)
+
+            acc = F.accuracy(y, t)
+
+            sum_test_acc += float(acc.data) * len(t)
+
+    test_acc = sum_test_acc / len(test_set)
+
+    test_accuracies.append(test_acc)
+
+    print(
+        f"Epoch {epoch+1}/{EPOCHS}, "
+        f"Loss: {train_loss:.4f}, "
+        f"Train Acc: {train_acc:.4f}, "
+        f"Test Acc: {test_acc:.4f}"
+    )
 
 
 # TODO: Dropout fehlt noch, ist aber nicht zentral für das Architekturverständnis; kann man erst mal ohne machen

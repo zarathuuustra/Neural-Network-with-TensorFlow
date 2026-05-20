@@ -71,7 +71,7 @@ class SelfAttention(Layer):
 
         V = self.value(x)
 
-        K_t = F.transpose([K, (0, 2, 1)]) # könnte auch ein Tupel sein, nach ChatGPT
+        K_t = F.transpose(K, (0, 2, 1))
 
         scores = F.batch_matmul(Q, K_t)
 

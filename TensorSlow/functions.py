@@ -73,19 +73,46 @@ def reshape(x, shape):
         return as_variable(x)
     return Reshape(shape)(x)
 
+# alte Version des Transpose
+
+# class Transpose(Function):
+#     def forward(self, x):
+#         y = np.transpose(x)
+#         return y
+#
+#     def backward(self, gy):
+#         gx = transpose(gy)
+#         return gx
+#
+# def transpose(x):
+#     return Transpose()(x)
 
 class Transpose(Function):
+
+    def __init__(self, axes=None):
+        self.axes = axes
+
     def forward(self, x):
-        y = np.transpose(x)
+
+        xp = cuda.get_array_module(x)
+
+        y = xp.transpose(x, self.axes)
+
         return y
 
     def backward(self, gy):
-        gx = transpose(gy)
+
+        if self.axes is None:
+            return transpose(gy)
+
+        inverse_axes = tuple(np.argsort(self.axes))
+
+        gx = transpose(gy, inverse_axes)
+
         return gx
 
-def transpose(x):
-    return Transpose()(x)
-
+def transpose(x, axes=None):
+    return Transpose(axes)(x)
 
 class Sum(Function):
     def __init__(self, axis, keepdims):
