@@ -194,16 +194,65 @@ def sum_to(x, shape):
     if x.shape == shape:
         return as_variable(x)
     return SumTo(shape)(x)
+#
+# class MatMul(Function):
+#     def forward(self, x, W):
+#         y = x.dot(W)
+#         return y
+#
+#     def backward(self, gy):
+#         x, W = self.inputs
+#         gx = matmul(gy, W.T)
+#         gW = matmul(x.T, gy)
+#         return gx, gW
 
 class MatMul(Function):
+
     def forward(self, x, W):
-        y = x.dot(W)
+
+        xp = cuda.get_array_module(x)
+
+        # print("x shape:", x.shape)
+        # print("W shape:", W.shape)
+        #
+        # print("x ndim:", x.ndim)
+        # print("W ndim:", W.ndim)
+
+        y = xp.matmul(x, W)
+
         return y
 
     def backward(self, gy):
+
         x, W = self.inputs
-        gx = matmul(gy, W.T)
-        gW = matmul(x.T, gy)
+
+        # print("x shape:", x.shape)
+        # print("W shape:", W.shape)
+        # print("gy shape:", gy.shape)
+        #
+        # print("x ndim:", x.ndim)
+        # print("W ndim:", W.ndim)
+
+        # FALL 1:
+        # Klassische 2D-Matrizen
+        if x.ndim == 2 and W.ndim == 2:
+
+            gx = matmul(gy, W.T)
+
+            gW = matmul(x.T, gy)
+
+        # FALL 2:
+        # Transformer / 3D Tensoren
+        else:
+
+            W_t = transpose(W, (0,2,1))
+
+            x_t = transpose(x, (0,2,1))
+
+            gx = matmul(gy, W_t)
+
+            gW = matmul(x_t, gy)
+
         return gx, gW
 
 
@@ -213,31 +262,75 @@ def matmul(x, W):
 class BatchMatMul(Function):
 
     def forward(self, x, W):
+        xp = cuda.get_array_module(x)
+        y = xp.matmul(x, W)
+        return y
+
+    def backward(self, gy):
+        x, W = self.inputs
+        W_t = transpose(W, (0, 2, 1))
+        x_t = transpose(x, (0, 2, 1))
+        gx = batch_matmul(gy, W_t)
+        gW = batch_matmul(x_t, gy)
+        return gx, gW
+
+def batch_matmul(x, W):
+    return BatchMatMul()(x, W)
+
+# class Linear(Function):
+#     def forward(self, x, W, b):
+#         y = x.dot(W)
+#         if b is not None:
+#             y += b
+#         return y
+#
+#     def backward(self, gy):
+#         x, W, b = self.inputs
+#         gb = None if b.data is None else sum_to(gy, b.shape)
+#         gx = matmul(gy, W.T)
+#         gW = matmul(x.T, gy)
+#         return gx, gW, gb
+
+class Linear(Function):
+
+    def forward(self, x, W, b):
 
         xp = cuda.get_array_module(x)
 
         y = xp.matmul(x, W)
 
-        return y
-
-    def backward(self):
-        raise NotImplementedError
-
-def batch_matmul(x, W):
-    return BatchMatMul()(x, W)
-
-class Linear(Function):
-    def forward(self, x, W, b):
-        y = x.dot(W)
         if b is not None:
             y += b
+
         return y
 
     def backward(self, gy):
+
         x, W, b = self.inputs
+
         gb = None if b.data is None else sum_to(gy, b.shape)
-        gx = matmul(gy, W.T)
-        gW = matmul(x.T, gy)
+
+        # 2D FALL
+        if x.ndim == 2:
+
+            gx = matmul(gy, W.T)
+
+            gW = matmul(x.T, gy)
+
+        # 3D FALL
+        else:
+
+            W_t = transpose(W, (1,0))
+
+            x_t = transpose(x, (0,2,1))
+
+            gx = matmul(gy, W_t)
+
+            gW = matmul(x_t, gy)
+
+            # Batchdimension aufsummieren
+            gW = gW.sum(axis=0)
+
         return gx, gW, gb
 
 

@@ -257,6 +257,8 @@ for epoch in range(EPOCHS):
         # Backpropagation
         loss.backward()
 
+        print(model.patch_embed.cls_token.grad)
+
         # Parameter updaten
         optimizer.update()
 
