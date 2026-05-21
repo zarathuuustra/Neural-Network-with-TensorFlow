@@ -98,20 +98,20 @@ class PatchEmbedding(Layer):
             (b, self.num_patches, self.embed_dim)
         )
 
-        cls_tokens = np.repeat(
-            self.cls_token.data,
-            b,
-            axis=0
-        )
-
-        x = np.concatenate(
-            [cls_tokens, embeddings.data],
-            axis=1
-        )
-
-        x = x + self.pos_embed.data
+        # cls_tokens = np.repeat(
+        #     self.cls_token.data,
+        #     b,
+        #     axis=0
+        # )
+        #
+        # x = np.concatenate(
+        #     [cls_tokens, embeddings.data],
+        #     axis=1
+        # )
+        #
+        # x = x + self.pos_embed.data
         # langfristig problematisch, da ich dadurch Gradienten und Autograd verliere
-        return x
+        return embeddings
 
 # MLP class is already in our framework
 
@@ -152,9 +152,9 @@ class TransformerEncoder(Layer):
                  drop_rate):
 
         super().__init__()
-
+        self.norm1 = L.LayerNorm(embed_dim)
         self.attn = SelfAttention(embed_dim)
-
+        self.norm2 = L.LayerNorm(embed_dim)
         self.mlp = TransformerMLP(
             in_features=embed_dim,
             hidden_features=mlp_dim
@@ -162,11 +162,15 @@ class TransformerEncoder(Layer):
 
     def forward(self, x):
 
-        attn_out = self.attn(x)
+        attn_out = self.attn(
+            self.norm1(x)
+        )
 
         x = x + attn_out
 
-        mlp_out = self.mlp(x)
+        mlp_out = self.mlp(
+            self.norm2(x)
+        )
 
         x = x + mlp_out
 
@@ -257,7 +261,17 @@ for epoch in range(EPOCHS):
         # Backpropagation
         loss.backward()
 
-        print(model.patch_embed.cls_token.grad)
+        # print(model.patch_embed.proj.W.grad)
+        #
+        # print(model.encoders[0].attn.query.W.grad)
+        #
+        # print(model.encoders[0].attn.key.W.grad)
+        #
+        # print(model.encoders[0].attn.value.W.grad)
+        #
+        # print(model.head.W.grad)
+        #
+        # print(model.patch_embed.cls_token.grad) # for testing purposes
 
         # Parameter updaten
         optimizer.update()

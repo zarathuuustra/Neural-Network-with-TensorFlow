@@ -155,6 +155,78 @@ class Sum(Function):
 def sum(x, axis=None, keepdims=False):
     return Sum(axis, keepdims)(x)
 
+class Mean(Function):
+    def __init__(self, axis=None, keepdims=False):
+
+        self.axis = axis
+        self.keepdims = keepdims
+
+    def forward(self, x):
+
+        self.x_shape = x.shape
+
+        if self.axis is None:
+
+            self.count = x.size
+
+        else:
+
+            if isinstance(self.axis, int):
+
+                self.count = x.shape[self.axis]
+
+            else:
+
+                self.count = 1
+
+                for ax in self.axis:
+                    self.count *= x.shape[ax]
+
+        y = x.mean(axis=self.axis, keepdims=self.keepdims)
+
+        return y
+
+    def backward(self, gy):
+
+        gy = gy / self.count
+
+        gy = utils.reshape_sum_backward(
+            gy,
+            self.x_shape,
+            self.axis,
+            self.keepdims
+        )
+
+        gx = broadcast_to(gy, self.x_shape)
+
+        return gx
+
+
+def mean(x, axis=None, keepdims=False):
+    return Mean(axis, keepdims)(x)
+
+class Sqrt(Function):
+
+    def forward(self, x):
+
+        xp = cuda.get_array_module(x)
+
+        y = xp.sqrt(x)
+
+        return y
+
+    def backward(self, gy):
+
+        x, = self.inputs
+
+        gx = gy * (0.5 / sqrt(x))
+
+        return gx
+
+
+def sqrt(x):
+    return Sqrt()(x)
+
 class BroadcastTo(Function):
     def __init__(self, shape):
         self.shape = shape
@@ -259,19 +331,62 @@ class MatMul(Function):
 def matmul(x, W):
     return MatMul()(x, W)
 
+# Alte BatchMatMul-Version
+# class BatchMatMul(Function):
+#
+#     def forward(self, x, W):
+#         xp = cuda.get_array_module(x)
+#         y = xp.matmul(x, W)
+#         return y
+#
+#     def backward(self, gy):
+#         x, W = self.inputs
+#         W_t = transpose(W, (0, 2, 1))
+#         x_t = transpose(x, (0, 2, 1))
+#         gx = batch_matmul(gy, W_t)
+#         gW = batch_matmul(x_t, gy)
+#         return gx, gW
+
 class BatchMatMul(Function):
 
     def forward(self, x, W):
+
         xp = cuda.get_array_module(x)
+
         y = xp.matmul(x, W)
+
         return y
 
     def backward(self, gy):
+
         x, W = self.inputs
-        W_t = transpose(W, (0, 2, 1))
-        x_t = transpose(x, (0, 2, 1))
-        gx = batch_matmul(gy, W_t)
-        gW = batch_matmul(x_t, gy)
+
+        # FALL 1:
+        # Beide Tensoren 3D
+        if x.ndim == 3 and W.ndim == 3:
+
+            W_t = transpose(W, (0,2,1))
+            x_t = transpose(x, (0,2,1))
+
+            gx = batch_matmul(gy, W_t)
+
+            gW = batch_matmul(x_t, gy)
+
+        # FALL 2:
+        # W ist 2D
+        else:
+
+            W_t = transpose(W, (1,0))
+
+            gx = matmul(gy, W_t)
+
+            x_t = transpose(x, (0,2,1))
+
+            gW = batch_matmul(x_t, gy)
+
+            # Batch aufsummieren
+            gW = gW.sum(axis=0)
+
         return gx, gW
 
 def batch_matmul(x, W):

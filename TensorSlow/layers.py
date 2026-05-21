@@ -388,3 +388,30 @@ class BatchNorm(Layer):
             self._init_params(x)
         return F.batch_nrom(x, self.gamma, self.beta, self.avg_mean.data,
                             self.avg_var.data)
+
+class LayerNorm(Layer):
+
+    def __init__(self, embed_dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.gamma = Parameter(np.ones(embed_dim))
+        self.beta = Parameter(np.zeros(embed_dim))
+
+    def forward(self, x):
+
+        mean = F.mean(
+            x,
+            axis=-1,
+            keepdims=True
+        )
+
+        var = F.mean(
+            (x - mean) ** 2,
+            axis=-1,
+            keepdims=True
+        )
+
+        x_hat = (x - mean) / F.sqrt(var + self.eps)
+        y = self.gamma * x_hat + self.beta
+
+        return y
