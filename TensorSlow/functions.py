@@ -155,7 +155,54 @@ class Sum(Function):
 def sum(x, axis=None, keepdims=False):
     return Sum(axis, keepdims)(x)
 
+# class Mean(Function):
+#     def __init__(self, axis=None, keepdims=False):
+#
+#         self.axis = axis
+#         self.keepdims = keepdims
+#
+#     def forward(self, x):
+#
+#         self.x_shape = x.shape
+#
+#         if self.axis is None:
+#
+#             self.count = x.size
+#
+#         else:
+#
+#             if isinstance(self.axis, int):
+#
+#                 self.count = x.shape[self.axis]
+#
+#             else:
+#
+#                 self.count = 1
+#
+#                 for ax in self.axis:
+#                     self.count = self.count * x.shape[ax]
+#
+#         y = x.mean(axis=self.axis, keepdims=self.keepdims)
+#
+#         return y
+#
+#     def backward(self, gy):
+#
+#         gy = gy / self.count
+#
+#         gy = utils.reshape_sum_backward(
+#             gy,
+#             self.x_shape,
+#             self.axis,
+#             self.keepdims
+#         )
+#
+#         gx = broadcast_to(gy, self.x_shape)
+#
+#         return gx
+
 class Mean(Function):
+
     def __init__(self, axis=None, keepdims=False):
 
         self.axis = axis
@@ -165,30 +212,11 @@ class Mean(Function):
 
         self.x_shape = x.shape
 
-        if self.axis is None:
-
-            self.count = x.size
-
-        else:
-
-            if isinstance(self.axis, int):
-
-                self.count = x.shape[self.axis]
-
-            else:
-
-                self.count = 1
-
-                for ax in self.axis:
-                    self.count *= x.shape[ax]
-
         y = x.mean(axis=self.axis, keepdims=self.keepdims)
 
         return y
 
     def backward(self, gy):
-
-        gy = gy / self.count
 
         gy = utils.reshape_sum_backward(
             gy,
@@ -199,8 +227,24 @@ class Mean(Function):
 
         gx = broadcast_to(gy, self.x_shape)
 
-        return gx
+        size = 1
 
+        if self.axis is None:
+
+            size = np.prod(self.x_shape)
+
+        elif isinstance(self.axis, int):
+
+            size = self.x_shape[self.axis]
+
+        else:
+
+            for ax in self.axis:
+                size *= self.x_shape[ax]
+
+        gx = gx / size
+
+        return gx
 
 def mean(x, axis=None, keepdims=False):
     return Mean(axis, keepdims)(x)
@@ -208,11 +252,9 @@ def mean(x, axis=None, keepdims=False):
 class Sqrt(Function):
 
     def forward(self, x):
-
+        # print(type(x))
         xp = cuda.get_array_module(x)
-
         y = xp.sqrt(x)
-
         return y
 
     def backward(self, gy):
@@ -247,6 +289,35 @@ def broadcast_to(x, shape):
         return as_variable(x)
     return BroadcastTo(shape)(x)
 
+class Concat(Function):
+
+    def __init__(self, axis=0):
+        self.axis = axis
+
+    def forward(self, *xs):
+
+        xp = cuda.get_array_module(xs[0])
+
+        self.shapes = [x.shape for x in xs]
+
+        y = xp.concatenate(xs, axis=self.axis)
+
+        return y
+
+    def backward(self, gy):
+
+        sizes = [shape[self.axis] for shape in self.shapes]
+
+        indices = np.cumsum(sizes)[:-1]
+
+        gxs = np.split(gy, indices, axis=self.axis)
+
+        # print(f"Der Typ von dem was konkateniert wird ist: {type(gxs)}")
+
+        return tuple(gxs) # möglicher Übeltäter
+
+def concat(xs, axis=0):
+    return Concat(axis)(*xs)
 
 class SumTo(Function):
     def __init__(self, shape):
@@ -266,7 +337,8 @@ def sum_to(x, shape):
     if x.shape == shape:
         return as_variable(x)
     return SumTo(shape)(x)
-#
+
+# Old MatMul
 # class MatMul(Function):
 #     def forward(self, x, W):
 #         y = x.dot(W)
@@ -372,6 +444,9 @@ class BatchMatMul(Function):
 
             gW = batch_matmul(x_t, gy)
 
+            # print("(3D) Der Typ von gx ist:", type(gx))
+            # print("(3D) Der Typ von gW ist:", type(gW))
+
         # FALL 2:
         # W ist 2D
         else:
@@ -387,6 +462,8 @@ class BatchMatMul(Function):
             # Batch aufsummieren
             gW = gW.sum(axis=0)
 
+            # print("(2D) Der Typ von gx ist:", type(gx))
+            # print("(2D) Der Typ von gW ist:", type(gW))
         return gx, gW
 
 def batch_matmul(x, W):
@@ -415,7 +492,7 @@ class Linear(Function):
         y = xp.matmul(x, W)
 
         if b is not None:
-            y += b
+            y = y + b
 
         return y
 
@@ -595,22 +672,53 @@ def softmax_simple(x, axis=1):
     return y / sum_y
 
 
+# class Softmax(Function):
+#     def __init__(self, axis=1):
+#         self.axis = axis
+#
+#     def forward(self, x):
+#         xp = cuda.get_array_module(x)
+#         y = x - x.max(axis=self.axis, keepdims=True)
+#         y = xp.exp(y)
+#         y = y / y.sum(axis=self.axis, keepdims=True)
+#         return y
+#
+#     def backward(self, gy): # bzw. hier
+#         y = self.outputs[0]()
+#         gx = y * gy # Fehler hier vielleicht
+#         sumdx = gx.sum(axis=self.axis, keepdims=True)
+#         gx = gx - y * sumdx
+#         print("gy shape:", gy.shape)
+#         print("y shape:", y.shape)
+#         return gx
+#
 class Softmax(Function):
+
     def __init__(self, axis=1):
         self.axis = axis
 
     def forward(self, x):
+
         xp = cuda.get_array_module(x)
-        y = x - x.max(axis=self.axis, keepdims=True)
-        y = xp.exp(y)
-        y /= y.sum(axis=self.axis, keepdims=True)
+
+        shifted = x - x.max(axis=self.axis, keepdims=True)
+
+        exp_x = xp.exp(shifted)
+
+        y = exp_x / exp_x.sum(axis=self.axis, keepdims=True)
+
         return y
 
     def backward(self, gy):
+
         y = self.outputs[0]()
+
         gx = y * gy
+
         sumdx = gx.sum(axis=self.axis, keepdims=True)
-        gx -= y * sumdx
+
+        gx = gx - y * sumdx
+
         return gx
 
 
@@ -682,7 +790,7 @@ class SoftmaxCrossEntropy(Function):
         x, t = self.inputs
         N, CLS_NUM = x.shape
 
-        gy *= 1/N
+        gy = gy * 1/N
         y = softmax(x)
         # convert to one-hot
         xp = cuda.get_array_module(t.data)

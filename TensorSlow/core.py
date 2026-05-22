@@ -109,28 +109,15 @@ class Variable:
         return TensorSlow.functions.sum(self, axis, keepdims)
 
     def backward(self, retain_grad=False, create_graph=False):
-        """
 
-        :param retain_grad: if true = gradients retain derivates;
-        if false = derivates of intermediate variables is reset
-        :param create_graph: if true = create graph
-        :return:
-        """
-        # for the user to omit y.grad = np.array(1.0)
-        if self.grad is None:  # added
-            # self.grad = np.ones_like(self.data)  # creates a derivative-> =1
-            self.grad = Variable(np.ones_like(self.data)) # reference to a Variable instance
+        if self.grad is None:
+            self.grad = Variable(np.ones_like(self.data))
 
         funcs = []
-        seen_set = set()  # purpose = to prevent the same function from being added to the list more than once
+        seen_set = set()
 
         def add_func(f):
-            """
-            list of functions will be sorted by generation
-            :param f:
-            :return:
-            """
-            if f not in seen_set:
+            if f is not None and f not in seen_set:
                 funcs.append(f)
                 seen_set.add(f)
                 funcs.sort(key=lambda x: x.generation)
@@ -138,30 +125,47 @@ class Variable:
         add_func(self.creator)
 
         while funcs:
-            f = funcs.pop()  # 1. Get a function
+            f = funcs.pop()
 
-            ###### backpropagation ################
-            gys = [output().grad for output in f.outputs]  # Summarise the derivatives of the output variables in the list
-            # the output is weakref
+            # WICHTIG:
+            # rohe ndarray-Gradienten holen
+            gys = [output().grad.data for output in f.outputs]
 
-            with using_config ('enable_backprop', create_graph):
-                gxs = f.backward(*gys)  # call backpropagation and unwrap the list
-                if not isinstance(gxs, tuple):  # transform gxs into tuple if it is not
+            with using_config('enable_backprop', create_graph):
+
+                gxs = f.backward(*gys)
+
+                if not isinstance(gxs, tuple):
                     gxs = (gxs,)
 
-                for x, gx in zip(f.inputs, gxs):  # set the derivate in the backpropagation to the grad variable
+                for x, gx in zip(f.inputs, gxs):
+
+                    # FALLS backward versehentlich Variable zurückgibt
+                    if isinstance(gx, Variable):
+                        gx = gx.data
+
+                    # Debug
+                    # print("GX TYPE:", type(gx))
+                    #
+                    # if isinstance(gx, np.ndarray):
+                    #     print("GX DTYPE:", gx.dtype)
+                    #
+                    #     if gx.dtype == object:
+                    #         print("OBJECT DETECTED")
+                    #         print(type(gx.flat[0]))
+
+                    # Gradienten sauber speichern
                     if x.grad is None:
-                        x.grad = gx
+                        x.grad = Variable(gx)
                     else:
-                        x.grad = x.grad + gx
+                        x.grad.data = x.grad.data + gx
 
                     if x.creator is not None:
-                        add_func(x.creator)  # 4. add previous functions to the list
+                        add_func(x.creator)
 
-                if not retain_grad:
-                    for y in f.outputs:
-                        y().grad = None  # y is weakref
-
+            if not retain_grad:
+                for y in f.outputs:
+                    y().grad = None
 
 class Parameter(Variable):
     pass
@@ -193,7 +197,7 @@ class Function:
     def __call__(self, *inputs):  # Asterisk for any number of arguments
         """
         Retrieves data from the Variable and saving the calculation results to the Variable.
-        :param inputs:
+        # :param inputs:
         :return:
         """
         inputs = [as_variable(input) for input in inputs]

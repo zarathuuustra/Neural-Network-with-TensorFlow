@@ -18,7 +18,6 @@ from TensorSlow.optimizers import Adam as Ada
 from TensorSlow.models import MLP, SelfAttention
 from TensorSlow import DataLoader
 from TensorSlow.dataloaders import SeqDataLoader
-from TensorSlow.datasets import Spiral
 from common.nlp_util import (preprocess, create_contexts_target,convert_one_hot, MatMul, SoftmaxWithLoss,
                              create_contexts_target, convert_one_hot, Trainer, Adam)
 import math
@@ -64,7 +63,6 @@ print(f"Length of test_loader: {len(test_loader)} batches of {BATCH_SIZE}...")
 
 
 class PatchEmbedding(Layer):
-
     def __init__(self, img_size, patch_size, in_channels, embed_dim):
         super().__init__()
 
@@ -77,11 +75,10 @@ class PatchEmbedding(Layer):
         )
         self.embed_dim = embed_dim
         self.num_patches = (img_size // patch_size) ** 2
-        self.cls_token = Parameter(np.zeros((1, 1, embed_dim)))
-        self.pos_embed = Parameter(np.zeros((1, 1 + self.num_patches, embed_dim)))
+        self.cls_token = Parameter(np.random.randn(1, 1, embed_dim) * 0.02)
 
+        self.pos_embed = Parameter(np.random.randn(1, 1 + self.num_patches, embed_dim) * 0.02)
     def forward(self, x):
-
         patches = F.im2col(
             x,
             kernel_size=self.patch_size,
@@ -91,27 +88,23 @@ class PatchEmbedding(Layer):
         )
 
         embeddings = self.proj(patches)
-
         b = x.shape[0]
         embeddings = F.reshape(
             embeddings,
             (b, self.num_patches, self.embed_dim)
         )
 
-        # cls_tokens = np.repeat(
-        #     self.cls_token.data,
-        #     b,
-        #     axis=0
-        # )
-        #
-        # x = np.concatenate(
-        #     [cls_tokens, embeddings.data],
-        #     axis=1
-        # )
-        #
-        # x = x + self.pos_embed.data
+        cls_tokens = F.broadcast_to(
+            self.cls_token,
+            (b, 1, self.embed_dim)
+        )
+
+        x = F.concat((cls_tokens, embeddings), axis=1)
+
+        x = x + self.pos_embed # .data hier (falls es nicht funktioniert)
         # langfristig problematisch, da ich dadurch Gradienten und Autograd verliere
-        return embeddings
+
+        return x
 
 # MLP class is already in our framework
 
@@ -136,11 +129,8 @@ class TransformerMLP(Layer):
     def forward(self, x):
 
         x = self.fc1(x)
-
         x = F.gelu(x)
-
         x = self.fc2(x)
-
         return x
 
 class TransformerEncoder(Layer):
@@ -161,17 +151,13 @@ class TransformerEncoder(Layer):
         )
 
     def forward(self, x):
-
-        attn_out = self.attn(
-            self.norm1(x)
-        )
-
+        # print("TransformerEncoder, vor attn_out, Wert:", self.attn)
+        # print("TransformerEncoder, vor attn_out, Typ:", type(self.attn))
+        attn_out = self.attn(self.norm1(x))
+        # print("TransformerEncoder, nach attn_out, Wert:", attn_out.creator)
         x = x + attn_out
 
-        mlp_out = self.mlp(
-            self.norm2(x)
-        )
-
+        mlp_out = self.mlp(self.norm2(x))
         x = x + mlp_out
 
         return x
@@ -190,21 +176,9 @@ class VisionTransformer(Layer):
                 drop_rate
             )
             setattr(self, f"encoder_{i}", encoder)
-
+            # print("Das hier ist der Encoder:", encoder)
             self.encoders.append(encoder)
-
-        # Different version of setting the Layer as Unterlayer
-        # self.encoders = [
-        #     TransformerEncoder(
-        #         embed_dim,
-        #         num_heads,
-        #         mlp_dim,
-        #         drop_rate
-        #     )
-        #     for _ in range(depth)
-        # ]
-        # self.norm = nn.LayerNorm(embed_dim) # noch keine LayerNorm
-
+        self.norm = L.LayerNorm(embed_dim)
         self.head = L.Linear(
             out_size=num_classes,
             in_size=embed_dim
@@ -213,16 +187,24 @@ class VisionTransformer(Layer):
     def forward(self, x):
         x = self.patch_embed(x)
         for encoder in self.encoders:
+            # print("after patch:", x.creator)
             x = encoder(x)
-        # x = self.norm(x) # Noch keine LayerNorm
+            # print("after encoder:", x.creator)
+            # print(f"Der Typ von X ist: {type(x)}")
+        x = self.norm(x)
         cls_token = x[:, 0]
+        # print("Das hier ist der cls_token:", cls_token)
+        # print("Das hier ist der Typ von cls_token:", type(cls_token))
         return self.head(cls_token)
 
 model = VisionTransformer(
     IMAGE_SIZE, PATCH_SIZE, CHANNELS, NUM_CLASSES,
     EMBED_DIM, DEPTH, NUM_HEADS, MLP_DIM, DROP_RATE
 )# move to the target device
-print(model)
+
+print("Das hier ist das Modell", model)
+# for p in model.params():
+#     print(p.shape)
 
 ## 9. Defining a Loss function and optimizer
 
@@ -261,19 +243,28 @@ for epoch in range(EPOCHS):
         # Backpropagation
         loss.backward()
 
-        # print(model.patch_embed.proj.W.grad)
-        #
-        # print(model.encoders[0].attn.query.W.grad)
-        #
-        # print(model.encoders[0].attn.key.W.grad)
-        #
-        # print(model.encoders[0].attn.value.W.grad)
-        #
-        # print(model.head.W.grad)
-        #
-        # print(model.patch_embed.cls_token.grad) # for testing purposes
+        # print("Der Erschaffer von W ist:", model.encoders[0].attn.query.W.creator)
+        # print("Der Gradient von W (patch_embed) ist:", model.patch_embed.proj.W.grad)
+        # print("Der Gradient von W (attn, query) ist:", model.encoders[0].attn.query.W.grad)
+        # print("Der Gradient von W (attn, key) ist:", model.encoders[0].attn.key.W.grad)
+        # print("Der Gradient von W (attn, value) ist:", model.encoders[0].attn.value.W.grad)
+        # print("Der Gradient W (model, head) ist:", model.head.W.grad)
+        # print("Der Gradient des CLS_Token ist:", model.patch_embed.cls_token.grad) # for testing purposes
 
         # Parameter updaten
+        # for param in model.params():
+        #     if param.grad is not None:
+        #         print("PARAM:", param)
+        #         print("DTYPE:", param.grad.data.dtype)
+        #         print()
+        #
+        # params_dict = {}
+        # model._flatten_params(params_dict)
+
+        # for name, param in params_dict.items():
+        #     if param.grad is not None:
+        #         print(name, param.grad.data.dtype)
+
         optimizer.update()
 
         # Statistik sammeln
@@ -291,15 +282,11 @@ for epoch in range(EPOCHS):
     with TensorSlow.no_grad():
 
         for x, t in test_loader:
-
             y = model(x)
-
             acc = F.accuracy(y, t)
-
             sum_test_acc += float(acc.data) * len(t)
 
     test_acc = sum_test_acc / len(test_set)
-
     test_accuracies.append(test_acc)
 
     print(
@@ -310,41 +297,4 @@ for epoch in range(EPOCHS):
     )
 
 
-# TODO: Dropout fehlt noch, ist aber nicht zentral für das Architekturverständnis; kann man erst mal ohne machen
-# TODO: Es fehlen außerdem: LayerNorm, MultiHeadAttention
-
-# model = MLP((hidden_size, 10))
-# model = MLP((hidden_size, hidden_size, 10), activation=F.relu)
-# optimizer = optimizers.SGD().setup(model)  # default lr=0.01
-#
-#
-# for epoch in range(max_epoch):
-#     sum_loss, sum_acc = 0, 0
-#
-#     for x, t in train_loader:
-#         y = model(x)
-#         loss = F.softmax_cross_entropy(y, t)
-#         acc = F.accuracy(y, t)
-#         model.cleargrads()
-#         loss.backward()
-#         optimizer.update()
-#
-#         sum_loss += float(loss.data) * len(t)
-#         sum_acc += float(acc.data) * len(t)
-#
-#     print('epoch: {}'.format(epoch + 1))
-#     print('train loss: {:.4f}, accuracy: {:.2f}'.format(
-#         sum_loss / len(train_set), sum_acc / len(train_set)))
-#
-#     sum_loss, sum_acc = 0, 0
-#     with TensorSlow.no_grad():
-#         for x, t in test_loader:
-#             y = model(x)
-#             loss = F.softmax_cross_entropy(y, t)
-#             acc = F.accuracy(y, t)
-#
-#             sum_loss += float(loss.data) * len(t)
-#             sum_acc += float(acc.data) * len(t)
-#
-#     print('test loss: {:.4f}, accuracy: {:.2f}'.format(
-#         sum_loss / len(test_set), sum_acc / len(test_set)))
+# TODO: Es fehlen: MultiHeadAttention & Dropout

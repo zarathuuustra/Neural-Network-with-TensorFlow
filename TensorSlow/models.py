@@ -66,19 +66,11 @@ class SelfAttention(Layer):
 
     def forward(self, x):
         Q = self.query(x)
-
         K = self.key(x)
-
         V = self.value(x)
-
         K_t = F.transpose(K, (0, 2, 1))
-
         scores = F.batch_matmul(Q, K_t)
-
         scores = scores / np.sqrt(self.embed_dim)
-
         attention = F.softmax(scores, axis=-1)
-
         output = F.batch_matmul(attention, V)
-
         return output
