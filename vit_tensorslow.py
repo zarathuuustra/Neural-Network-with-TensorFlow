@@ -4,6 +4,7 @@ if '__file__' in globals():
     import os, sys
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+import matplotlib.pyplot as plt
 import numpy as np
 from common.nlp_util import preprocess
 from TensorSlow.core import Function
@@ -29,7 +30,7 @@ import math
 ## Setting the hyperparameters
 BATCH_SIZE = 16 # CPU optimiert 32 # instead of 128
 EPOCHS = 10
-LEARNING_RATE = 2e-3 # CPU optimiert 1e-3 # instead of 3e-4
+LEARNING_RATE = 1e-3 # Beim Bauen genutzt: 2e-3 # Im Video: 3e-4
 PATCH_SIZE = 4 # like tokens
 NUM_CLASSES = 10
 IMAGE_SIZE = 32
@@ -50,6 +51,24 @@ transform = TensorSlow.transforms.Compose([
 # Getting a dataset
 train_set = TensorSlow.datasets.CIFAR10(train=True)
 test_set = TensorSlow.datasets.CIFAR10(train=False)
+
+x, y = train_set[0]
+
+print("X-Typ:", x.dtype)
+print("X min:", x.min())
+print("X max:", x.max())
+
+labels = []
+
+for i in range(100):
+    _, y = test_set[i]
+    labels.append(y)
+
+labels = np.array(labels)
+
+print(labels.min())
+print(labels.max())
+print(np.unique(labels))
 
 print(len(train_set))
 print(len(test_set))
@@ -78,6 +97,7 @@ class PatchEmbedding(Layer):
         self.cls_token = Parameter(np.random.randn(1, 1, embed_dim) * 0.02)
 
         self.pos_embed = Parameter(np.random.randn(1, 1 + self.num_patches, embed_dim) * 0.02)
+
     def forward(self, x):
         patches = F.im2col(
             x,
@@ -106,10 +126,8 @@ class PatchEmbedding(Layer):
 
         return x
 
-# MLP class is already in our framework
 
 class TransformerMLP(Layer):
-
     def __init__(self,
                  in_features,
                  hidden_features):
@@ -176,7 +194,6 @@ class VisionTransformer(Layer):
                 drop_rate
             )
             setattr(self, f"encoder_{i}", encoder)
-            # print("Das hier ist der Encoder:", encoder)
             self.encoders.append(encoder)
         self.norm = L.LayerNorm(embed_dim)
         self.head = L.Linear(
@@ -187,14 +204,9 @@ class VisionTransformer(Layer):
     def forward(self, x):
         x = self.patch_embed(x)
         for encoder in self.encoders:
-            # print("after patch:", x.creator)
             x = encoder(x)
-            # print("after encoder:", x.creator)
-            # print(f"Der Typ von X ist: {type(x)}")
         x = self.norm(x)
         cls_token = x[:, 0]
-        # print("Das hier ist der cls_token:", cls_token)
-        # print("Das hier ist der Typ von cls_token:", type(cls_token))
         return self.head(cls_token)
 
 model = VisionTransformer(
@@ -219,6 +231,7 @@ optimizer = Ada().setup(model)
 
 train_accuracies = []
 test_accuracies = []
+losses = []
 
 for epoch in range(EPOCHS):
 
@@ -275,6 +288,7 @@ for epoch in range(EPOCHS):
     train_acc = sum_acc / len(train_set)
 
     train_accuracies.append(train_acc)
+    losses.append(train_loss)
 
     # TEST / EVALUATION
     sum_test_acc = 0
@@ -296,5 +310,26 @@ for epoch in range(EPOCHS):
         f"Test Acc: {test_acc:.4f}"
     )
 
+epochs = range(1, len(losses) + 1)
+
+# Loss Plot
+plt.figure(figsize=(8,5))
+plt.plot(epochs, losses)
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training Loss")
+plt.grid(True)
+plt.show()
+
+# Accuracy Plot
+plt.figure(figsize=(8,5))
+plt.plot(epochs, train_accuracies, label="Train Accuracy")
+plt.plot(epochs, test_accuracies, label="Test Accuracy")
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("Train vs Test Accuracy")
+plt.legend()
+plt.grid(True)
+plt.show()
 
 # TODO: Es fehlen: MultiHeadAttention & Dropout

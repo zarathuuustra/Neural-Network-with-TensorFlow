@@ -75,22 +75,44 @@ class CenterCrop:
         return img.crop((left, up, right, bottom))
 
 
+# class ToArray:
+#     """Convert PIL Image to NumPy array."""
+#     def __init__(self, dtype=np.float32):
+#         self.dtype = dtype
+#
+#     def __call__(self, img):
+#         if isinstance(img, np.ndarray):
+#             return img
+#         if isinstance(img, Image.Image):
+#             img = np.asarray(img)
+#             img = img.transpose(2, 0, 1)
+#             img = img.astype(self.dtype)
+#             return img
+#         else:
+#             raise TypeError
+
 class ToArray:
-    """Convert PIL Image to NumPy array."""
     def __init__(self, dtype=np.float32):
         self.dtype = dtype
 
     def __call__(self, img):
+
         if isinstance(img, np.ndarray):
-            return img
-        if isinstance(img, Image.Image):
-            img = np.asarray(img)
-            img = img.transpose(2, 0, 1)
-            img = img.astype(self.dtype)
-            return img
+            array = img.astype(self.dtype)
+
+        elif isinstance(img, Image.Image):
+            array = np.asarray(img, dtype=self.dtype)
+
+            # HWC -> CHW
+            if array.ndim == 3:
+                array = array.transpose(2, 0, 1)
+
         else:
             raise TypeError
 
+        # DAS FEHLT:
+        array /= 255.0
+        return array
 
 class ToPIL:
     """Convert NumPy array to PIL Image."""

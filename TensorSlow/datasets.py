@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from TensorSlow.utils import get_file, cache_dir
-from TensorSlow.transforms import Compose, Flatten, ToFloat, Normalize
+from TensorSlow.transforms import Compose, Flatten, ToFloat, Normalize, ToArray
 
 
 class Dataset:
@@ -127,7 +127,7 @@ class MNIST(Dataset):
 class CIFAR10(Dataset):
 
     def __init__(self, train=True,
-                 transform=Compose([ToFloat(), Normalize(mean=0.5, std=0.5)]),
+                 transform=Compose([ToArray(), Normalize(mean=0.5, std=0.5)]),
                  target_transform=None):
         super().__init__(train, transform, target_transform)
 
