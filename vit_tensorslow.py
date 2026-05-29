@@ -121,8 +121,7 @@ class PatchEmbedding(Layer):
 
         x = F.concat((cls_tokens, embeddings), axis=1)
 
-        x = x + self.pos_embed # .data hier (falls es nicht funktioniert)
-        # langfristig problematisch, da ich dadurch Gradienten und Autograd verliere
+        x = x + self.pos_embed
 
         return x
 
@@ -169,22 +168,16 @@ class TransformerEncoder(Layer):
         )
 
     def forward(self, x):
-        # print("TransformerEncoder, vor attn_out, Wert:", self.attn)
-        # print("TransformerEncoder, vor attn_out, Typ:", type(self.attn))
         attn_out = self.attn(self.norm1(x))
-        # print("TransformerEncoder, nach attn_out, Wert:", attn_out.creator)
         x = x + attn_out
-
         mlp_out = self.mlp(self.norm2(x))
         x = x + mlp_out
-
         return x
 
 class VisionTransformer(Layer):
     def __init__(self, img_size, patch_size, in_channels, num_classes, embed_dim, depth, num_heads, mlp_dim, drop_rate):
         super().__init__()
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
-        # Sequential -> when the data goes through the Sequential class it will go through it Layer by Layer
         self.encoders = []
         for i in range (depth):
             encoder = TransformerEncoder(
@@ -199,7 +192,7 @@ class VisionTransformer(Layer):
         self.head = L.Linear(
             out_size=num_classes,
             in_size=embed_dim
-        )  # act as a classifier
+        )
 
     def forward(self, x):
         x = self.patch_embed(x)
@@ -215,10 +208,8 @@ model = VisionTransformer(
 )# move to the target device
 
 print("Das hier ist das Modell", model)
-# for p in model.params():
-#     print(p.shape)
 
-## 9. Defining a Loss function and optimizer
+## Defining a Loss function and optimizer
 
 # Measure how wrong our model is
 criterion = F.softmax_cross_entropy
@@ -227,7 +218,7 @@ criterion = F.softmax_cross_entropy
 optimizer = Ada().setup(model)
 # Da TensorSlow aktuell kein AdamW-Optimizer hat wird derzeit der Adam-Optimizer benutzt
 
-## 10. Defining a Training Loop function
+## Defining a Training Loop function
 
 train_accuracies = []
 test_accuracies = []
@@ -255,28 +246,6 @@ for epoch in range(EPOCHS):
 
         # Backpropagation
         loss.backward()
-
-        # print("Der Erschaffer von W ist:", model.encoders[0].attn.query.W.creator)
-        # print("Der Gradient von W (patch_embed) ist:", model.patch_embed.proj.W.grad)
-        # print("Der Gradient von W (attn, query) ist:", model.encoders[0].attn.query.W.grad)
-        # print("Der Gradient von W (attn, key) ist:", model.encoders[0].attn.key.W.grad)
-        # print("Der Gradient von W (attn, value) ist:", model.encoders[0].attn.value.W.grad)
-        # print("Der Gradient W (model, head) ist:", model.head.W.grad)
-        # print("Der Gradient des CLS_Token ist:", model.patch_embed.cls_token.grad) # for testing purposes
-
-        # Parameter updaten
-        # for param in model.params():
-        #     if param.grad is not None:
-        #         print("PARAM:", param)
-        #         print("DTYPE:", param.grad.data.dtype)
-        #         print()
-        #
-        # params_dict = {}
-        # model._flatten_params(params_dict)
-
-        # for name, param in params_dict.items():
-        #     if param.grad is not None:
-        #         print(name, param.grad.data.dtype)
 
         optimizer.update()
 
@@ -331,5 +300,3 @@ plt.title("Train vs Test Accuracy")
 plt.legend()
 plt.grid(True)
 plt.show()
-
-# TODO: Es fehlen: MultiHeadAttention & Dropout

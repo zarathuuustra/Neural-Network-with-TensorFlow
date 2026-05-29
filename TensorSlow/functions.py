@@ -96,20 +96,6 @@ def get_item(x, slices):
     """ Base function to support matrix slicing """
     return GetItem(slices)(x)
 
-# alte Version des Transpose
-
-# class Transpose(Function):
-#     def forward(self, x):
-#         y = np.transpose(x)
-#         return y
-#
-#     def backward(self, gy):
-#         gx = transpose(gy)
-#         return gx
-#
-# def transpose(x):
-#     return Transpose()(x)
-
 class Transpose(Function):
 
     def __init__(self, axes=None):
@@ -154,52 +140,6 @@ class Sum(Function):
 
 def sum(x, axis=None, keepdims=False):
     return Sum(axis, keepdims)(x)
-
-# class Mean(Function):
-#     def __init__(self, axis=None, keepdims=False):
-#
-#         self.axis = axis
-#         self.keepdims = keepdims
-#
-#     def forward(self, x):
-#
-#         self.x_shape = x.shape
-#
-#         if self.axis is None:
-#
-#             self.count = x.size
-#
-#         else:
-#
-#             if isinstance(self.axis, int):
-#
-#                 self.count = x.shape[self.axis]
-#
-#             else:
-#
-#                 self.count = 1
-#
-#                 for ax in self.axis:
-#                     self.count = self.count * x.shape[ax]
-#
-#         y = x.mean(axis=self.axis, keepdims=self.keepdims)
-#
-#         return y
-#
-#     def backward(self, gy):
-#
-#         gy = gy / self.count
-#
-#         gy = utils.reshape_sum_backward(
-#             gy,
-#             self.x_shape,
-#             self.axis,
-#             self.keepdims
-#         )
-#
-#         gx = broadcast_to(gy, self.x_shape)
-#
-#         return gx
 
 class Mean(Function):
 
@@ -295,26 +235,16 @@ class Concat(Function):
         self.axis = axis
 
     def forward(self, *xs):
-
         xp = cuda.get_array_module(xs[0])
-
         self.shapes = [x.shape for x in xs]
-
         y = xp.concatenate(xs, axis=self.axis)
-
         return y
 
     def backward(self, gy):
-
         sizes = [shape[self.axis] for shape in self.shapes]
-
         indices = np.cumsum(sizes)[:-1]
-
         gxs = np.split(gy, indices, axis=self.axis)
-
-        # print(f"Der Typ von dem was konkateniert wird ist: {type(gxs)}")
-
-        return tuple(gxs) # möglicher Übeltäter
+        return tuple(gxs)
 
 def concat(xs, axis=0):
     return Concat(axis)(*xs)
@@ -338,157 +268,70 @@ def sum_to(x, shape):
         return as_variable(x)
     return SumTo(shape)(x)
 
-# Old MatMul
-# class MatMul(Function):
-#     def forward(self, x, W):
-#         y = x.dot(W)
-#         return y
-#
-#     def backward(self, gy):
-#         x, W = self.inputs
-#         gx = matmul(gy, W.T)
-#         gW = matmul(x.T, gy)
-#         return gx, gW
-
 class MatMul(Function):
-
     def forward(self, x, W):
-
         xp = cuda.get_array_module(x)
-
-        # print("x shape:", x.shape)
-        # print("W shape:", W.shape)
-        #
-        # print("x ndim:", x.ndim)
-        # print("W ndim:", W.ndim)
-
         y = xp.matmul(x, W)
-
         return y
 
     def backward(self, gy):
-
         x, W = self.inputs
-
-        # print("x shape:", x.shape)
-        # print("W shape:", W.shape)
-        # print("gy shape:", gy.shape)
-        #
-        # print("x ndim:", x.ndim)
-        # print("W ndim:", W.ndim)
 
         # FALL 1:
         # Klassische 2D-Matrizen
         if x.ndim == 2 and W.ndim == 2:
-
             gx = matmul(gy, W.T)
-
             gW = matmul(x.T, gy)
 
         # FALL 2:
         # Transformer / 3D Tensoren
         else:
-
             W_t = transpose(W, (0,2,1))
-
             x_t = transpose(x, (0,2,1))
-
             gx = matmul(gy, W_t)
-
             gW = matmul(x_t, gy)
-
         return gx, gW
 
 
 def matmul(x, W):
     return MatMul()(x, W)
 
-# Alte BatchMatMul-Version
-# class BatchMatMul(Function):
-#
-#     def forward(self, x, W):
-#         xp = cuda.get_array_module(x)
-#         y = xp.matmul(x, W)
-#         return y
-#
-#     def backward(self, gy):
-#         x, W = self.inputs
-#         W_t = transpose(W, (0, 2, 1))
-#         x_t = transpose(x, (0, 2, 1))
-#         gx = batch_matmul(gy, W_t)
-#         gW = batch_matmul(x_t, gy)
-#         return gx, gW
-
 class BatchMatMul(Function):
-
     def forward(self, x, W):
-
         xp = cuda.get_array_module(x)
-
         y = xp.matmul(x, W)
-
         return y
 
     def backward(self, gy):
-
         x, W = self.inputs
 
         # FALL 1:
         # Beide Tensoren 3D
         if x.ndim == 3 and W.ndim == 3:
-
             W_t = transpose(W, (0,2,1))
             x_t = transpose(x, (0,2,1))
-
             gx = batch_matmul(gy, W_t)
-
             gW = batch_matmul(x_t, gy)
-
-            # print("(3D) Der Typ von gx ist:", type(gx))
-            # print("(3D) Der Typ von gW ist:", type(gW))
 
         # FALL 2:
         # W ist 2D
         else:
-
             W_t = transpose(W, (1,0))
-
             gx = matmul(gy, W_t)
-
             x_t = transpose(x, (0,2,1))
-
             gW = batch_matmul(x_t, gy)
-
             # Batch aufsummieren
             gW = gW.sum(axis=0)
-
-            # print("(2D) Der Typ von gx ist:", type(gx))
-            # print("(2D) Der Typ von gW ist:", type(gW))
         return gx, gW
 
 def batch_matmul(x, W):
     return BatchMatMul()(x, W)
 
-# class Linear(Function):
-#     def forward(self, x, W, b):
-#         y = x.dot(W)
-#         if b is not None:
-#             y += b
-#         return y
-#
-#     def backward(self, gy):
-#         x, W, b = self.inputs
-#         gb = None if b.data is None else sum_to(gy, b.shape)
-#         gx = matmul(gy, W.T)
-#         gW = matmul(x.T, gy)
-#         return gx, gW, gb
 
 class Linear(Function):
 
     def forward(self, x, W, b):
-
         xp = cuda.get_array_module(x)
-
         y = xp.matmul(x, W)
 
         if b is not None:
@@ -497,27 +340,19 @@ class Linear(Function):
         return y
 
     def backward(self, gy):
-
         x, W, b = self.inputs
-
         gb = None if b.data is None else sum_to(gy, b.shape)
 
         # 2D FALL
         if x.ndim == 2:
-
             gx = matmul(gy, W.T)
-
             gW = matmul(x.T, gy)
 
         # 3D FALL
         else:
-
             W_t = transpose(W, (1,0))
-
             x_t = transpose(x, (0,2,1))
-
             gx = matmul(gy, W_t)
-
             gW = matmul(x_t, gy)
 
             # Batchdimension aufsummieren
@@ -671,27 +506,6 @@ def softmax_simple(x, axis=1):
     sum_y = sum(y, axis=axis, keepdims=True)
     return y / sum_y
 
-
-# class Softmax(Function):
-#     def __init__(self, axis=1):
-#         self.axis = axis
-#
-#     def forward(self, x):
-#         xp = cuda.get_array_module(x)
-#         y = x - x.max(axis=self.axis, keepdims=True)
-#         y = xp.exp(y)
-#         y = y / y.sum(axis=self.axis, keepdims=True)
-#         return y
-#
-#     def backward(self, gy): # bzw. hier
-#         y = self.outputs[0]()
-#         gx = y * gy # Fehler hier vielleicht
-#         sumdx = gx.sum(axis=self.axis, keepdims=True)
-#         gx = gx - y * sumdx
-#         print("gy shape:", gy.shape)
-#         print("y shape:", y.shape)
-#         return gx
-#
 class Softmax(Function):
 
     def __init__(self, axis=1):
