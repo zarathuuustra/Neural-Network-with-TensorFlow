@@ -13,7 +13,6 @@ The implementation adapts the original Vision Transformer architecture to the Te
 Transformer-based image classification can be built without relying on PyTorch or TensorFlow. The model was trained and 
 evaluated on the CIFAR-10 dataset.
 
-***
 
 # Important files in the Vision Transformer Branch
 
@@ -36,7 +35,6 @@ Combines Layer Normalization, Self-Attention, residual connections and the MLP b
 #### VisionTransformer
 The complete Vision Transformer architecture used for image classification.
 
-***
 
 ##  2. model.py 
 Contains the implementation of: 
@@ -46,8 +44,6 @@ Contains the implementation of:
 A custom implementation of scaled dot-product attention.
 The attention mechanism computes Query, Key and Value matrices and performs attention scoring without using external 
 deep learning libraries.
-
-***
 
 ## 3. layers.py
 
@@ -60,7 +56,6 @@ Contains several neural network layers including:
 
 The custom LayerNorm implementation was added to support Transformer architectures.
 
-***
 
 ## 4. functions.py
 
@@ -78,8 +73,6 @@ Additional functions implemented for the Vision Transformer include:
 These operations required custom backward implementations so gradients could correctly propagate 
 through the computational graph.
 
-***
-
 ## Technical Challenges
 
 During development several non-trivial problems had to be solved:
@@ -94,9 +87,8 @@ During development several non-trivial problems had to be solved:
 - Transformer-specific tensor shape handling
 
 A significant part of the project involved debugging and extending TensorSlow's automatic differentiation engine to 
-xsupport the Vision Transformer architecture.
+support the Vision Transformer architecture.
 
-***
 
 ## Results
 
